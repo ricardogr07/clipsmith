@@ -43,8 +43,8 @@ llm:
 
 caption:
   font: "Arial"
-  font_size: 14
-  outline: 2
+  font_size: 72   # ASS pts at 1080×1920 PlayRes — adjust to taste
+  outline: 3
   position: bottom
 
 reframe:

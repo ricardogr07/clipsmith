@@ -40,8 +40,8 @@ class LLMConfig(BaseModel):
 
 class CaptionConfig(BaseModel):
     font: str = "Arial"
-    font_size: int = 14
-    outline: int = 2
+    font_size: int = 72   # ASS pts at 1080×1920; 72 ≈ TikTok-style captions
+    outline: int = 3
     position: str = "bottom"
 
 
