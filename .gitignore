@@ -1,0 +1,24 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# Pipeline artifacts
+out/
+work/
+state.json
+*.mp4
+*.m4a
+*.ass
+*.srt
+transcript.json
+chat.json
+picks.json
+candidates.json

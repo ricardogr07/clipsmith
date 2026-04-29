@@ -1,0 +1,46 @@
+[project]
+name = "clipsmith"
+version = "0.1.0"
+description = "Twitch VOD -> AI-selected vertical clips with burned-in Spanish captions."
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "PyYAML>=6.0",
+    "typer>=0.12",
+    "rich>=13.7",
+    "python-dotenv>=1.0",
+    # Phase 2+
+    "faster-whisper>=1.0",
+    "chat-downloader>=0.3",
+    "twitch-dl>=3.3",
+    # Phase 4+
+    "openai>=1.40",
+    "anthropic>=0.40",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+clipsmith = "clipsmith.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/clipsmith"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

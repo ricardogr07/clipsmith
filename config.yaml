@@ -1,0 +1,54 @@
+channels:
+  - chuyelwuero
+
+# Polling cadence in seconds for the watcher
+poll_interval_s: 120
+
+# Where downloaded VODs, transcripts, and clip outputs go
+work_dir: ./work
+out_dir: ./out
+
+clip:
+  min_seconds: 15
+  max_seconds: 30
+  # Pre-roll/post-roll relative to LLM-picked center
+  preroll_s: 25
+  postroll_s: 10
+
+candidates:
+  # Sliding-window size (seconds) for chat density
+  density_window_s: 15
+  # Multiplier over baseline chat rate to count as a peak
+  density_peak_multiplier: 4.0
+  # Boost applied when an existing Twitch clip has its vod_offset here
+  existing_clip_boost: 100.0
+  # Boost per `!clip` chat message in the window
+  clip_command_boost: 25.0
+  # Dedupe candidates within this window (seconds)
+  dedupe_window_s: 60
+
+transcribe:
+  # faster-whisper model: tiny | base | small | medium | large-v3
+  model: medium
+  # int8 is the recommended CPU quantization
+  compute_type: int8
+  language: es
+
+llm:
+  # provider: openai | anthropic | ollama
+  provider: anthropic
+  model_anthropic: claude-sonnet-4-6
+  model_openai: gpt-4.1
+  model_ollama: llama3.1
+
+caption:
+  font: "Arial"
+  font_size: 14
+  outline: 2
+  position: bottom
+
+reframe:
+  # center | webcam (uses webcam_rect below) | face (mediapipe, future)
+  mode: center
+  # If mode=webcam, hardcoded source-rect to crop around (in source pixels)
+  webcam_rect: null # [x, y, w, h]
