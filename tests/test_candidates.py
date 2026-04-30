@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from clipsmith.candidates import build_candidates, CandidateMoment, _dedupe
+from clipsmith.candidates import build_candidates, _dedupe
 from clipsmith.candidates_math import compute_density_scores
 from clipsmith.chat import ChatLog, ChatMessage
 from clipsmith.settings import CandidatesConfig

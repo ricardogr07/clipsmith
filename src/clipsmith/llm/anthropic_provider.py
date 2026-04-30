@@ -7,11 +7,10 @@ within one VOD run — reducing cost ~10x on the stable prefix.
 
 from __future__ import annotations
 
-import json
 import logging
 
 from ..candidates import CandidateMoment
-from .base import CLIP_PICK_JSON_SCHEMA, SYSTEM_PROMPT, ClipPick
+from .base import SYSTEM_PROMPT, ClipPick
 
 log = logging.getLogger(__name__)
 

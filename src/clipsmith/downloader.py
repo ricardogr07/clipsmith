@@ -53,6 +53,6 @@ def download_vod(
         ]
 
     log.info("running: %s", " ".join(cmd))
-    result = subprocess.run(cmd, check=True, text=True, capture_output=False)
+    subprocess.run(cmd, check=True, text=True, capture_output=False)
     log.info("download finished: %s", out_path)
     return DownloadResult(video_id=video_id, mp4_path=out_path)

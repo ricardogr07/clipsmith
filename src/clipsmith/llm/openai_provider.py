@@ -6,7 +6,6 @@ automatic caching can reuse the stable prefix across candidates.
 
 from __future__ import annotations
 
-import json
 import logging
 
 from ..candidates import CandidateMoment
