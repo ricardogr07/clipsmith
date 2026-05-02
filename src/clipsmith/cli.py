@@ -58,6 +58,7 @@ def watch(
 def run_vod(
     video_id: str = typer.Argument(..., help="Twitch video (VOD) id"),
     config_path: Path = typer.Option(Path("config.yaml"), "--config", "-c"),
+    local: bool = typer.Option(False, "--local", help="Skip all Twitch API calls; use manually placed mp4"),
     skip_download: bool = typer.Option(False, "--skip-download", help="Use existing mp4 in work dir"),
     skip_transcribe: bool = typer.Option(False, "--skip-transcribe", help="Use cached transcript.json"),
     skip_chat: bool = typer.Option(False, "--skip-chat", help="Use cached chat.json"),
@@ -72,25 +73,39 @@ def run_vod(
     cfg = load_config(config_path)
     secrets = load_secrets()
 
-    with TwitchClient(secrets.twitch_client_id, secrets.twitch_client_secret) as tc:
-        body = tc._get("/videos", {"id": video_id})  # noqa: SLF001
-        data = body.get("data") or []
-        if not data:
-            console.print(f"[red]VOD not found:[/red] {video_id}")
-            raise typer.Exit(1)
-        v = data[0]
+    if local:
+        video = Video(
+            id=video_id,
+            user_id="",
+            user_login=cfg.channels[0] if cfg.channels else "local",
+            title=video_id,
+            created_at="",
+            published_at="",
+            url=f"https://www.twitch.tv/videos/{video_id}",
+            duration="",
+            type="archive",
+        )
+        skip_download = True
+    else:
+        with TwitchClient(secrets.twitch_client_id, secrets.twitch_client_secret) as tc:
+            body = tc._get("/videos", {"id": video_id})  # noqa: SLF001
+            data = body.get("data") or []
+            if not data:
+                console.print(f"[red]VOD not found:[/red] {video_id}")
+                raise typer.Exit(1)
+            v = data[0]
 
-    video = Video(
-        id=v["id"],
-        user_id=v["user_id"],
-        user_login=v["user_login"],
-        title=v["title"],
-        created_at=v["created_at"],
-        published_at=v.get("published_at", v["created_at"]),
-        url=v["url"],
-        duration=v["duration"],
-        type=v["type"],
-    )
+        video = Video(
+            id=v["id"],
+            user_id=v["user_id"],
+            user_login=v["user_login"],
+            title=v["title"],
+            created_at=v["created_at"],
+            published_at=v.get("published_at", v["created_at"]),
+            url=v["url"],
+            duration=v["duration"],
+            type=v["type"],
+        )
 
     try:
         _process_vod(
@@ -147,7 +162,7 @@ def clip_cmd(
         raise typer.Exit(1)
 
     out_dir = cfg.out_dir.expanduser() / video_id
-    console.print(f"[cyan]cutting {len(picks)} clip(s)[/cyan] → {out_dir}")
+    console.print(f"[cyan]cutting {len(picks)} clip(s)[/cyan] -> {out_dir}")
     clip_paths = cut_all_clips(mp4_path, transcript, picks, out_dir, cfg)
     console.print(f"[green]done[/green]: {len(clip_paths)} clip(s) in {out_dir}")
 

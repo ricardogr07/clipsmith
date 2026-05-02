@@ -37,20 +37,12 @@ def download_vod(
         return DownloadResult(video_id=video_id, mp4_path=out_path)
 
     cmd = [
-        "twitch-dl",
-        "download",
-        video_id,
+        "python", "-m", "twitchdl", "download", video_id,
         "--quality", quality,
         "--output", str(out_path),
-        "--overwrite" if overwrite else "--no-join",  # --no-join skips if exists
     ]
-    # Remove --no-join when not overwriting — twitch-dl won't re-download if file exists.
-    if not overwrite:
-        cmd = [
-            "twitch-dl", "download", video_id,
-            "--quality", quality,
-            "--output", str(out_path),
-        ]
+    if overwrite:
+        cmd.append("--overwrite")
 
     log.info("running: %s", " ".join(cmd))
     subprocess.run(cmd, check=True, text=True, capture_output=False)
