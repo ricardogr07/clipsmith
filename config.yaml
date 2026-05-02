@@ -1,5 +1,4 @@
-channels:
-  - chuyelwuero
+channels: []
 
 # Polling cadence in seconds for the watcher
 poll_interval_s: 120
