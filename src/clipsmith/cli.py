@@ -44,6 +44,7 @@ def process(
     provider: str | None = typer.Option(None, "--provider", help="Override LLM provider (anthropic|openai)"),
     captions: bool | None = typer.Option(None, "--captions/--no-captions", help="Burn captions into video (overrides config)"),
     reframe: bool | None = typer.Option(None, "--reframe/--no-reframe", help="Reframe to 9:16 vertical (overrides config)"),
+    skip_transcribe: bool = typer.Option(False, "--skip-transcribe", help="Use cached transcript.json if it exists"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Process a local MP4 through the full pipeline: transcribe -> LLM -> clips."""
@@ -93,6 +94,7 @@ def process(
         _process_vod(
             video, cfg, secrets,
             skip_download=True,
+            skip_transcribe=skip_transcribe,
             skip_chat=True,
             provider=provider,
         )

@@ -157,3 +157,47 @@ def test_no_candidates_for_completely_empty_data():
     cfg = _cfg()
     candidates = build_candidates(_chat([]), [], cfg)
     assert candidates == []
+
+
+# ── transcript hype signal ────────────────────────────────────────────────────
+
+def _transcript(segments: list[tuple[float, float, str]]):
+    from clipsmith.transcribe import Segment, Transcript, Word
+    segs = [Segment(start=s, end=e, text=t, words=[]) for s, e, t in segments]
+    return Transcript(video_id="v1", language="es", segments=segs)
+
+
+def test_transcript_hype_keyword_creates_candidate():
+    cfg = _cfg(density_peak_multiplier=99.0)
+    tr = _transcript([(120.0, 123.0, " jajaja qué bueno!")])
+    candidates = build_candidates(_chat([]), [], cfg, transcript=tr)
+    hype = [c for c in candidates if "transcript_hype" in c.sources]
+    assert hype, "hype keyword should create a candidate"
+    assert any(abs(c.t_center - 121.5) < 2 for c in hype)
+
+
+def test_transcript_hype_exclamation_scores():
+    cfg = _cfg(transcript_hype_score=12.0)
+    tr = _transcript([(50.0, 52.0, "¡increíble!")])
+    candidates = build_candidates(_chat([]), [], cfg, transcript=tr)
+    hype = [c for c in candidates if "transcript_hype" in c.sources]
+    assert hype
+    assert hype[0].score > 0
+
+
+def test_transcript_no_hype_no_candidate():
+    cfg = _cfg(density_peak_multiplier=99.0)
+    tr = _transcript([(10.0, 12.0, "bien jugado"), (20.0, 22.0, "seguimos")])
+    candidates = build_candidates(_chat([]), [], cfg, transcript=tr)
+    hype = [c for c in candidates if "transcript_hype" in c.sources]
+    assert not hype
+
+
+def test_transcript_hype_merges_with_clip_command():
+    cfg = _cfg(clip_command_boost=25.0, transcript_hype_score=12.0, density_peak_multiplier=99.0)
+    msgs = [_msg(100.0, "!clip")]
+    tr = _transcript([(101.0, 103.0, "jajaja wow")])  # within 60s dedupe window
+    candidates = build_candidates(_chat(msgs), [], cfg, transcript=tr)
+    merged = [c for c in candidates if "clip_command" in c.sources and "transcript_hype" in c.sources]
+    assert merged, "clip_command and nearby transcript_hype should merge"
+    assert merged[0].score > 25.0  # combined score

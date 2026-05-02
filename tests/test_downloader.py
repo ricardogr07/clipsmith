@@ -41,5 +41,5 @@ def test_creates_vod_dir(tmp_path, monkeypatch):
     assert result.video_id == video_id
     assert result.mp4_path.parent == tmp_path / video_id
     assert len(calls) == 1
-    assert "twitch-dl" in calls[0][0]
+    assert "twitchdl" in " ".join(calls[0])
     assert video_id in calls[0]
