@@ -9,7 +9,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $DIST_DIR  = "dist\clipsmith"
-$ZIP_NAME  = "clipsmith-windows-x64.zip"
+$ZIP_NAME  = "dist\clipsmith-windows-x64.zip"
 
 # --- 1. Build with PyInstaller ---
 Write-Host "Building with PyInstaller..." -ForegroundColor Cyan
