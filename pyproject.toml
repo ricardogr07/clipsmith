@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Twitch VOD -> AI-selected vertical clips with burned-in Spanish captions."
 requires-python = ">=3.11"
 readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Ricardo García Ramírez", email = "rgr5882@gmail.com" }]
 dependencies = [
     "httpx>=0.27",
     "pydantic>=2.6",
@@ -12,14 +14,16 @@ dependencies = [
     "typer>=0.12",
     "rich>=13.7",
     "python-dotenv>=1.0",
-    # Phase 2+
     "faster-whisper>=1.0",
     "chat-downloader>=0.3",
     "twitch-dl>=3.3",
-    # Phase 4+
     "openai>=1.40",
     "anthropic>=0.40",
 ]
+
+[project.urls]
+Homepage = "https://github.com/ricardogr07/clipsmith"
+Repository = "https://github.com/ricardogr07/clipsmith"
 
 [project.optional-dependencies]
 dev = [
