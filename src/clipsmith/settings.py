@@ -46,7 +46,7 @@ class CaptionConfig(BaseModel):
 
 
 class ReframeConfig(BaseModel):
-    mode: Literal["center", "webcam", "face"] = "center"
+    mode: Literal["center", "webcam", "face", "none"] = "center"
     webcam_rect: list[int] | None = None
 
 

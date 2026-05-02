@@ -48,7 +48,7 @@ def _cut_one(
     _write_ass(transcript, start, end, config.caption, ass_path)
 
     cmd = _build_ffmpeg_cmd(mp4_path, start, end, ass_path, config.reframe, out_path)
-    log.info("clip %d  [%.1f–%.1fs]  →  %s", index, start, end, out_path.name)
+    log.info("clip %d  [%.1f-%.1fs]  ->  %s", index, start, end, out_path.name)
     log.debug("ffmpeg: %s", " ".join(cmd))
 
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -66,20 +66,25 @@ def _build_ffmpeg_cmd(
     reframe: ReframeConfig,
     out_path: Path,
 ) -> list[str]:
-    return [
+    cmd = [
         "ffmpeg", "-y",
         "-ss", f"{start:.3f}",
         "-i", str(mp4_path),
         "-t", f"{end - start:.3f}",
-        "-vf", _video_filter(reframe, ass_path),
-        "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "23",
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-movflags", "+faststart",
-        str(out_path),
     ]
+    if reframe.mode == "none":
+        cmd += ["-c:v", "copy", "-c:a", "copy"]
+    else:
+        cmd += [
+            "-vf", _video_filter(reframe, ass_path),
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "23",
+            "-c:a", "aac",
+            "-b:a", "128k",
+        ]
+    cmd += ["-movflags", "+faststart", str(out_path)]
+    return cmd
 
 
 def _video_filter(reframe: ReframeConfig, ass_path: Path) -> str:

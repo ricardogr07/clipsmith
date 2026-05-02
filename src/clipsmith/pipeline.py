@@ -7,7 +7,7 @@ import logging
 from rich.console import Console
 from rich.logging import RichHandler
 
-from .candidates import build_candidates, save_candidates
+from .candidates import CandidateMoment, build_candidates, save_candidates
 from .chat import download_chat
 from .clipper import cut_all_clips
 from .downloader import download_vod
@@ -48,8 +48,12 @@ def _process_vod(
     vod_dir = work_dir / video_id
     vod_dir.mkdir(parents=True, exist_ok=True)
 
-    with TwitchClient(secrets.twitch_client_id, secrets.twitch_client_secret) as tc:
-        existing_clips = tc.get_clips_for_vod(video.user_id, video_id)
+    if secrets.twitch_client_id and secrets.twitch_client_secret and video.user_id:
+        with TwitchClient(secrets.twitch_client_id, secrets.twitch_client_secret) as tc:
+            existing_clips = tc.get_clips_for_vod(video.user_id, video_id)
+    else:
+        existing_clips = []
+        log.info("skipping existing-clips fetch (no Twitch credentials or local mode)")
 
     console.print(
         f"VOD [bold]{video_id}[/bold]: {video.title!r} by {video.user_login} "
@@ -83,6 +87,23 @@ def _process_vod(
 
     console.print("[cyan]scoring candidates...[/cyan]")
     candidates = build_candidates(chat, existing_clips, cfg.candidates)
+
+    if not candidates:
+        log.info("no chat signals — falling back to evenly-spaced transcript samples")
+        duration = transcript.segments[-1].end if transcript.segments else 0.0
+        interval = cfg.clip.max_seconds * 2
+        t = interval / 2
+        while t < duration:
+            candidates.append(
+                CandidateMoment(
+                    t_center=t,
+                    score=1.0,
+                    sources=["transcript_sample"],
+                    reasons=[f"evenly-spaced sample at t={t:.1f}s (no chat data)"],
+                )
+            )
+            t += interval
+
     save_candidates(candidates, vod_dir / "candidates.json")
     console.print(f"[green]candidates[/green]: {len(candidates)} moments")
     for i, c in enumerate(candidates[:10], 1):
@@ -114,10 +135,10 @@ def _process_vod(
     )
     picks_path = vod_dir / "picks.json"
     save_picks(picks, picks_path)
-    console.print(f"[green]picks[/green]: {len(picks)} accepted → {picks_path}")
+    console.print(f"[green]picks[/green]: {len(picks)} accepted -> {picks_path}")
     for i, pr in enumerate(picks, 1):
         console.print(
-            f"  #{i:2d}  [{pr.pick.start_offset_s:.1f}–{pr.pick.end_offset_s:.1f}s]  "
+            f"  #{i:2d}  [{pr.pick.start_offset_s:.1f}-{pr.pick.end_offset_s:.1f}s]  "
             f"{pr.pick.title_es!r}"
         )
 
@@ -126,6 +147,6 @@ def _process_vod(
         return
 
     out_dir = cfg.out_dir.expanduser() / video_id
-    console.print(f"[cyan]cutting clips[/cyan] → {out_dir}")
+    console.print(f"[cyan]cutting clips[/cyan] -> {out_dir}")
     clip_paths = cut_all_clips(mp4_path, transcript, picks, out_dir, cfg)
     console.print(f"[green]done[/green]: {len(clip_paths)} clip(s) in {out_dir}")

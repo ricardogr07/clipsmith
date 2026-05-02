@@ -63,7 +63,7 @@ def select_clips(
 
         pick = _clamp_duration(pick, config)
         log.info(
-            "  accepted: [%.1f–%.1f] (%.1fs) — %s",
+            "  accepted: [%.1f-%.1f] (%.1fs) - %s",
             pick.start_offset_s, pick.end_offset_s, pick.duration_s, pick.title_es,
         )
         picks.append(PickResult(candidate=candidate, pick=pick))

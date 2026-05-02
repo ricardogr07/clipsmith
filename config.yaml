@@ -29,7 +29,7 @@ candidates:
 
 transcribe:
   # faster-whisper model: tiny | base | small | medium | large-v3
-  model: medium
+  model: small
   # int8 is the recommended CPU quantization
   compute_type: int8
   language: es
@@ -48,7 +48,7 @@ caption:
   position: bottom
 
 reframe:
-  # center | webcam (uses webcam_rect below) | face (mediapipe, future)
-  mode: center
+  # center | webcam (uses webcam_rect below) | face (mediapipe, future) | none (keep source resolution)
+  mode: none
   # If mode=webcam, hardcoded source-rect to crop around (in source pixels)
   webcam_rect: null # [x, y, w, h]
