@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 import subprocess
+import sys
 import unicodedata
 from pathlib import Path
 
@@ -14,6 +15,14 @@ from .settings import AppConfig, ReframeConfig
 from .transcribe import Transcript
 
 log = logging.getLogger(__name__)
+
+
+def _find_ffmpeg() -> str:
+    """Return path to ffmpeg: bundled copy next to exe, or fall back to PATH."""
+    bundled = Path(sys.executable).parent / "ffmpeg.exe"
+    if bundled.exists():
+        return str(bundled)
+    return "ffmpeg"
 
 
 def cut_all_clips(
@@ -51,7 +60,12 @@ def _cut_one(
     log.info("clip %d  [%.1f-%.1fs]  ->  %s", index, start, end, out_path.name)
     log.debug("ffmpeg: %s", " ".join(cmd))
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+    except FileNotFoundError:
+        raise RuntimeError(
+            "ffmpeg not found. Place ffmpeg.exe next to clipsmith.exe or add it to PATH."
+        )
     if result.returncode != 0:
         log.error("ffmpeg stderr:\n%s", result.stderr[-2000:])
         raise RuntimeError(f"ffmpeg failed for clip {index} ({out_path.name})")
@@ -67,7 +81,7 @@ def _build_ffmpeg_cmd(
     out_path: Path,
 ) -> list[str]:
     cmd = [
-        "ffmpeg", "-y",
+        _find_ffmpeg(), "-y",
         "-ss", f"{start:.3f}",
         "-i", str(mp4_path),
         "-t", f"{end - start:.3f}",

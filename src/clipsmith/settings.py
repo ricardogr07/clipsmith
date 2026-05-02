@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Literal
 
@@ -63,10 +64,20 @@ class AppConfig(BaseModel):
     reframe: ReframeConfig = ReframeConfig()
 
 
+def _env_file_paths() -> list[Path]:
+    """Return .env search paths: next to the exe (bundled), then CWD."""
+    paths: list[Path] = []
+    exe_env = Path(sys.executable).parent / ".env"
+    if exe_env.parent != Path(".").resolve():
+        paths.append(exe_env)
+    paths.append(Path(".env"))
+    return paths
+
+
 class Secrets(BaseSettings):
     """Loaded from environment / .env."""
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_env_file_paths(), extra="ignore")
 
     twitch_client_id: str = ""
     twitch_client_secret: str = ""
