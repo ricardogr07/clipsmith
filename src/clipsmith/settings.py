@@ -24,6 +24,7 @@ class CandidatesConfig(BaseModel):
     existing_clip_boost: float = 100.0
     clip_command_boost: float = 25.0
     dedupe_window_s: int = 60
+    transcript_hype_score: float = 12.0
 
 
 class TranscribeConfig(BaseModel):
@@ -40,6 +41,7 @@ class LLMConfig(BaseModel):
 
 
 class CaptionConfig(BaseModel):
+    enabled: bool = False
     font: str = "Arial"
     font_size: int = 72   # ASS pts at 1080×1920; 72 ≈ TikTok-style captions
     outline: int = 3

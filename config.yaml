@@ -25,6 +25,8 @@ candidates:
   clip_command_boost: 25.0
   # Dedupe candidates within this window (seconds)
   dedupe_window_s: 60
+  # Score per hype keyword hit found in transcript (jaja, wow, etc.)
+  transcript_hype_score: 12.0
 
 transcribe:
   # faster-whisper model: tiny | base | small | medium | large-v3
@@ -41,6 +43,7 @@ llm:
   model_ollama: llama3.1
 
 caption:
+  enabled: false  # set true to burn subtitles into the video
   font: "Arial"
   font_size: 72   # ASS pts at 1080×1920 PlayRes — adjust to taste
   outline: 3

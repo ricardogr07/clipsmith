@@ -15,7 +15,15 @@ from pathlib import Path
 from .candidates_math import compute_density_scores
 from .chat import ChatLog
 from .settings import CandidatesConfig
+from .transcribe import Transcript
 from .twitch_client import Clip
+
+# Spanish/stream hype keywords that suggest a funny or exciting moment.
+_HYPE_KEYWORDS = frozenset({
+    "jaja", "jeje", "jajaj", "jajaja", "lmao", "lol", "xd", "xdd",
+    "omg", "wow", "nooo", "noooo", "increíble", "increible", "tremendo",
+    "brutal", "dios", "wtf", "carajo", "caray", "bestia", "monstro",
+})
 
 
 @dataclass
@@ -34,6 +42,7 @@ def build_candidates(
     existing_clips: list[Clip],
     config: CandidatesConfig,
     *,
+    transcript: Transcript | None = None,
     vod_duration_s: float | None = None,
 ) -> list[CandidateMoment]:
     """Return CandidateMoments sorted by score descending."""
@@ -73,6 +82,22 @@ def build_candidates(
             "chat_density",
             f"chat density peak (score={score:.1f}) at t={t:.1f}s",
         ))
+
+    # --- Signal 4: transcript hype moments (laughter/exclamations in speech) ---
+    if transcript is not None:
+        for seg in transcript.segments:
+            text = seg.text.lower()
+            kw_hits = sum(1 for kw in _HYPE_KEYWORDS if kw in text)
+            punct_hits = text.count("!") + text.count("¡")
+            score = kw_hits * config.transcript_hype_score + punct_hits * (config.transcript_hype_score / 3)
+            if score > 0:
+                t = (seg.start + seg.end) / 2
+                raw.append((
+                    t,
+                    score,
+                    "transcript_hype",
+                    f"hype in transcript at t={seg.start:.1f}s: {seg.text.strip()!r}",
+                ))
 
     # --- Merge: deduplicate within dedupe_window_s, keeping max score ---
     merged = _dedupe(raw, window_s=config.dedupe_window_s)

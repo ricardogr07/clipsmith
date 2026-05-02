@@ -53,8 +53,10 @@ def _cut_one(
     start = pr.pick.start_offset_s
     end = pr.pick.end_offset_s
 
-    ass_path = out_path.with_suffix(".ass")
-    _write_ass(transcript, start, end, config.caption, ass_path)
+    ass_path: Path | None = None
+    if config.caption.enabled:
+        ass_path = out_path.with_suffix(".ass")
+        _write_ass(transcript, start, end, config.caption, ass_path)
 
     cmd = _build_ffmpeg_cmd(mp4_path, start, end, ass_path, config.reframe, out_path)
     log.info("clip %d  [%.1f-%.1fs]  ->  %s", index, start, end, out_path.name)
@@ -76,7 +78,7 @@ def _build_ffmpeg_cmd(
     mp4_path: Path,
     start: float,
     end: float,
-    ass_path: Path,
+    ass_path: Path | None,
     reframe: ReframeConfig,
     out_path: Path,
 ) -> list[str]:
@@ -86,11 +88,12 @@ def _build_ffmpeg_cmd(
         "-i", str(mp4_path),
         "-t", f"{end - start:.3f}",
     ]
-    if reframe.mode == "none":
+    if reframe.mode == "none" and ass_path is None:
         cmd += ["-c:v", "copy", "-c:a", "copy"]
     else:
+        vf = _video_filter(reframe, ass_path)
         cmd += [
-            "-vf", _video_filter(reframe, ass_path),
+            "-vf", vf,
             "-c:v", "libx264",
             "-preset", "fast",
             "-crf", "23",
@@ -101,16 +104,21 @@ def _build_ffmpeg_cmd(
     return cmd
 
 
-def _video_filter(reframe: ReframeConfig, ass_path: Path) -> str:
+def _video_filter(reframe: ReframeConfig, ass_path: Path | None) -> str:
+    parts: list[str] = []
+
     if reframe.mode == "webcam" and reframe.webcam_rect:
         x, y, w, h = reframe.webcam_rect
-        crop = f"crop={w}:{h}:{x}:{y},scale=1080:1920:flags=lanczos"
-    else:
-        crop = "crop=ih*9/16:ih,scale=1080:1920:flags=lanczos"
+        parts.append(f"crop={w}:{h}:{x}:{y},scale=1080:1920:flags=lanczos")
+    elif reframe.mode != "none":
+        parts.append("crop=ih*9/16:ih,scale=1080:1920:flags=lanczos")
 
-    # ffmpeg filter paths: forward slashes, drive colon escaped
-    ass_str = str(ass_path).replace("\\", "/").replace(":", "\\:")
-    return f"{crop},subtitles='{ass_str}'"
+    if ass_path is not None:
+        # ffmpeg filter paths: forward slashes, drive colon escaped
+        ass_str = str(ass_path).replace("\\", "/").replace(":", "\\:")
+        parts.append(f"subtitles='{ass_str}'")
+
+    return ",".join(parts)
 
 
 def _title_slug(title: str) -> str:
