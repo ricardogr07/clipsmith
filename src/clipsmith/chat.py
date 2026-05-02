@@ -1,12 +1,13 @@
-"""Download Twitch chat replay via chat-downloader and save as JSON."""
+"""Download Twitch chat replay via direct GQL and save as JSON."""
 
 from __future__ import annotations
 
 import json
 import logging
-import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+import httpx
 
 log = logging.getLogger(__name__)
 
@@ -16,6 +17,11 @@ HYPE_EMOTES = frozenset({
     "LULW", "KEKLEO", "xD", "JAJAJA", "monkaS", "GIGACHAD",
     "widepeepoHappy", "Pepega", "OMEGALUL", "EZ",
 })
+
+_GQL_URL = "https://gql.twitch.tv/gql"
+_CLIENT_ID = "kd1unb4b3q4t58fwlpcbzcbnm76a8fp"
+# Hash for VideoCommentsByOffsetOrCursor — verified working as of 2026-05.
+_COMMENTS_HASH = "b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a"
 
 
 @dataclass
@@ -42,33 +48,14 @@ class ChatLog:
         return cls(**d)
 
 
-def _parse_message(raw: dict) -> ChatMessage | None:
-    t = raw.get("time_in_seconds")
-    if t is None:
-        return None
-    msg = raw.get("message", "") or ""
-    author = (raw.get("author") or {}).get("name", "") or ""
-    is_clip = msg.strip().lower().startswith("!clip")
-    tokens = set(msg.split())
-    hype = len(tokens & HYPE_EMOTES)
-    return ChatMessage(
-        time_in_seconds=float(t),
-        message=msg,
-        author=author,
-        is_clip_command=is_clip,
-        hype_emote_count=hype,
-    )
-
-
 def download_chat(
     video_id: str,
     work_dir: Path,
     *,
     overwrite: bool = False,
 ) -> ChatLog:
-    """Fetch chat replay for a VOD using chat-downloader.
+    """Fetch chat replay for a VOD via Twitch GQL and save as chat.json.
 
-    Saves chat.json alongside the VOD in work_dir/<video_id>/.
     Returns cached result on subsequent calls unless overwrite=True.
     """
     vod_dir = work_dir / video_id
@@ -79,34 +66,85 @@ def download_chat(
         log.info("loading cached chat: %s", out_path)
         return ChatLog.from_json(out_path.read_text(encoding="utf-8"))
 
-    # chat-downloader outputs one JSON object per line (NDJSON).
-    url = f"https://www.twitch.tv/videos/{video_id}"
-    cmd = ["chat_downloader", url, "--output", str(out_path), "--message_types", "text_message"]
-    log.info("running: %s", " ".join(cmd))
-    subprocess.run(cmd, check=True)
-
-    # chat-downloader writes its own JSON file; parse it.
-    return _load_from_file(video_id, out_path)
-
-
-def _load_from_file(video_id: str, path: Path) -> ChatLog:
-    """Parse whatever chat-downloader wrote and normalise to ChatLog."""
-    raw_text = path.read_text(encoding="utf-8").strip()
-
-    # chat-downloader can output a JSON array or NDJSON depending on version.
-    if raw_text.startswith("["):
-        raw_items: list[dict] = json.loads(raw_text)
-    else:
-        raw_items = [json.loads(line) for line in raw_text.splitlines() if line.strip()]
-
-    messages: list[ChatMessage] = []
-    for item in raw_items:
-        msg = _parse_message(item)
-        if msg is not None:
-            messages.append(msg)
-
-    log.info("chat loaded: %d messages for VOD %s", len(messages), video_id)
+    messages = list(_fetch_all_comments(video_id))
+    log.info("chat fetched: %d messages for VOD %s", len(messages), video_id)
     chat = ChatLog(video_id=video_id, messages=messages)
-    # Overwrite with our normalised format so future loads use from_json fast path.
-    path.write_text(chat.to_json(), encoding="utf-8")
+    out_path.write_text(chat.to_json(), encoding="utf-8")
     return chat
+
+
+def _fetch_all_comments(video_id: str) -> list[ChatMessage]:
+    """Paginate through VideoCommentsByOffsetOrCursor until hasNextPage=False."""
+    messages: list[ChatMessage] = []
+    cursor: str | None = None
+    page = 0
+
+    with httpx.Client(timeout=30) as client:
+        while True:
+            variables: dict = {"videoID": video_id}
+            if cursor:
+                variables["cursor"] = cursor
+            else:
+                variables["contentOffsetSeconds"] = 0
+
+            payload = [{
+                "operationName": "VideoCommentsByOffsetOrCursor",
+                "variables": variables,
+                "extensions": {
+                    "persistedQuery": {
+                        "version": 1,
+                        "sha256Hash": _COMMENTS_HASH,
+                    }
+                },
+            }]
+
+            resp = client.post(_GQL_URL, json=payload, headers={"Client-ID": _CLIENT_ID})
+            resp.raise_for_status()
+            body = resp.json()
+
+            video = body[0].get("data", {}).get("video") or {}
+            comments = video.get("comments") or {}
+            edges = comments.get("edges") or []
+
+            for edge in edges:
+                cursor = edge.get("cursor")
+                node = edge.get("node")
+                if not node:
+                    continue
+                msg = _parse_node(node)
+                if msg is not None:
+                    messages.append(msg)
+
+            page += 1
+            if page % 20 == 0:
+                log.info("chat: fetched %d messages so far (page %d)...", len(messages), page)
+
+            if not comments.get("pageInfo", {}).get("hasNextPage"):
+                break
+
+    return messages
+
+
+def _parse_node(node: dict) -> ChatMessage | None:
+    t = node.get("contentOffsetSeconds")
+    if t is None:
+        return None
+
+    commenter = node.get("commenter") or {}
+    author = commenter.get("login") or commenter.get("displayName") or ""
+
+    fragments = (node.get("message") or {}).get("fragments") or []
+    # Fragments can be plain text or emote references — concatenate text fields.
+    msg = "".join(f.get("text") or "" for f in fragments).strip()
+
+    is_clip = msg.lower().startswith("!clip")
+    tokens = set(msg.split())
+    hype = len(tokens & HYPE_EMOTES)
+
+    return ChatMessage(
+        time_in_seconds=float(t),
+        message=msg,
+        author=author,
+        is_clip_command=is_clip,
+        hype_emote_count=hype,
+    )
