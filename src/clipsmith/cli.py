@@ -42,6 +42,8 @@ def process(
     mp4: Path = typer.Argument(..., help="Path to a local MP4 file to process"),
     config_path: Path = typer.Option(Path("config.yaml"), "--config", "-c"),
     provider: str | None = typer.Option(None, "--provider", help="Override LLM provider (anthropic|openai)"),
+    captions: bool | None = typer.Option(None, "--captions/--no-captions", help="Burn captions into video (overrides config)"),
+    reframe: bool | None = typer.Option(None, "--reframe/--no-reframe", help="Reframe to 9:16 vertical (overrides config)"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Process a local MP4 through the full pipeline: transcribe -> LLM -> clips."""
@@ -55,6 +57,13 @@ def process(
         raise typer.Exit(1)
 
     cfg = load_config(_resolve_config(config_path))
+    if captions is not None:
+        cfg.caption.enabled = captions
+    if reframe is not None:
+        if not reframe:
+            cfg.reframe.mode = "none"
+        elif cfg.reframe.mode == "none":
+            cfg.reframe.mode = "center"
     secrets = load_secrets()
 
     video_id = mp4.stem
@@ -183,12 +192,21 @@ def run_vod(
     skip_select: bool = typer.Option(False, "--skip-select", help="Skip LLM selection step"),
     skip_clip: bool = typer.Option(False, "--skip-clip", help="Skip ffmpeg clipping step"),
     provider: str | None = typer.Option(None, "--provider", help="Override LLM provider (anthropic|openai)"),
+    captions: bool | None = typer.Option(None, "--captions/--no-captions", help="Burn captions into video (overrides config)"),
+    reframe: bool | None = typer.Option(None, "--reframe/--no-reframe", help="Reframe to 9:16 vertical (overrides config)"),
     max_candidates: int = typer.Option(20, "--max-candidates", help="Max candidates to send to LLM"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Download, transcribe, score candidates, and select clips via LLM."""
     _setup_logging(verbose)
     cfg = load_config(config_path)
+    if captions is not None:
+        cfg.caption.enabled = captions
+    if reframe is not None:
+        if not reframe:
+            cfg.reframe.mode = "none"
+        elif cfg.reframe.mode == "none":
+            cfg.reframe.mode = "center"
     secrets = load_secrets()
 
     if local:
@@ -245,11 +263,20 @@ def run_vod(
 def clip_cmd(
     video_id: str = typer.Argument(..., help="Twitch video (VOD) id"),
     config_path: Path = typer.Option(Path("config.yaml"), "--config", "-c"),
+    captions: bool | None = typer.Option(None, "--captions/--no-captions", help="Burn captions into video (overrides config)"),
+    reframe: bool | None = typer.Option(None, "--reframe/--no-reframe", help="Reframe to 9:16 vertical (overrides config)"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Re-run the ffmpeg clipper from an existing picks.json (no LLM re-call)."""
     _setup_logging(verbose)
     cfg = load_config(config_path)
+    if captions is not None:
+        cfg.caption.enabled = captions
+    if reframe is not None:
+        if not reframe:
+            cfg.reframe.mode = "none"
+        elif cfg.reframe.mode == "none":
+            cfg.reframe.mode = "center"
 
     work_dir = cfg.work_dir.expanduser()
     vod_dir = work_dir / video_id
