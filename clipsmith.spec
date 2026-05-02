@@ -18,8 +18,8 @@ for pkg in ("faster_whisper", "ctranslate2", "onnxruntime", "huggingface_hub"):
     hiddenimports += h
 
 a = Analysis(
-    ["src/clipsmith/cli.py"],
-    pathex=["."],
+    ["main.py"],
+    pathex=[".", "src"],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports + [
@@ -38,7 +38,13 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        "pandas", "scipy", "matplotlib", "sklearn", "sklearn",
+        "PIL", "cv2", "tensorflow", "torch", "torchvision",
+        "IPython", "ipykernel", "notebook", "jupyter",
+        "pytest", "setuptools", "pip",
+        "tkinter", "_tkinter", "tcl", "tk",
+    ],
     noarchive=False,
 )
 
