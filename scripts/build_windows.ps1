@@ -13,7 +13,7 @@ $ZIP_NAME  = "clipsmith-windows-x64.zip"
 
 # --- 1. Build with PyInstaller ---
 Write-Host "Building with PyInstaller..." -ForegroundColor Cyan
-pyinstaller clipsmith.spec --clean
+python -m PyInstaller clipsmith.spec --clean -y
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
 # --- 2. Download ffmpeg static build (gyan.dev essentials build) ---
