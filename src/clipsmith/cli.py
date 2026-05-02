@@ -1,16 +1,18 @@
-"""clipsmith CLI: `watch`, `run-vod`, `clip`, `whoami`."""
+"""clipsmith CLI: `process`, `setup`, `watch`, `run-vod`, `clip`, `whoami`."""
 
 from __future__ import annotations
 
 import json
 import logging
+import shutil
+import sys
 from pathlib import Path
 
 import typer
 from rich.console import Console
 
 from .candidates import CandidateMoment
-from .clipper import cut_all_clips
+from .clipper import _find_ffmpeg, cut_all_clips
 from .llm.base import ClipPick
 from .pipeline import _process_vod, _setup_logging
 from .selector import PickResult
@@ -23,6 +25,122 @@ from .watcher import watch as watch_iter
 app = typer.Typer(add_completion=False, help="Twitch -> AI clip pipeline")
 console = Console()
 log = logging.getLogger(__name__)
+
+
+def _resolve_config(explicit: Path) -> Path:
+    """Return config path: explicit arg > bundled next to exe > cwd default."""
+    if explicit != Path("config.yaml"):
+        return explicit
+    bundled = Path(sys.executable).parent / "config.yaml"
+    if bundled.exists():
+        return bundled
+    return explicit
+
+
+@app.command()
+def process(
+    mp4: Path = typer.Argument(..., help="Path to a local MP4 file to process"),
+    config_path: Path = typer.Option(Path("config.yaml"), "--config", "-c"),
+    provider: str | None = typer.Option(None, "--provider", help="Override LLM provider (anthropic|openai)"),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Process a local MP4 through the full pipeline: transcribe -> LLM -> clips."""
+    _setup_logging(verbose)
+
+    if not mp4.exists():
+        console.print(f"[red]File not found:[/red] {mp4}")
+        raise typer.Exit(1)
+    if mp4.suffix.lower() != ".mp4":
+        console.print(f"[red]Expected an .mp4 file, got:[/red] {mp4.suffix}")
+        raise typer.Exit(1)
+
+    cfg = load_config(_resolve_config(config_path))
+    secrets = load_secrets()
+
+    video_id = mp4.stem
+    work_dir = cfg.work_dir.expanduser()
+    dest = work_dir / video_id / f"{video_id}.mp4"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    if not dest.exists():
+        console.print(f"[cyan]copying[/cyan] {mp4.name} -> {dest}")
+        shutil.copy2(mp4, dest)
+    else:
+        console.print(f"[dim]using existing[/dim] {dest}")
+
+    video = Video(
+        id=video_id,
+        user_id="",
+        user_login=cfg.channels[0] if cfg.channels else "local",
+        title=video_id,
+        created_at="",
+        published_at="",
+        url="",
+        duration="",
+        type="archive",
+    )
+
+    try:
+        _process_vod(
+            video, cfg, secrets,
+            skip_download=True,
+            skip_chat=True,
+            provider=provider,
+        )
+    except FileNotFoundError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def setup(
+    provider: str | None = typer.Option(None, "--provider", help="LLM provider: anthropic or openai"),
+    key: str | None = typer.Option(None, "--key", help="API key (omit to be prompted interactively)"),
+) -> None:
+    """First-run wizard: save your API key and verify ffmpeg is available."""
+    env_path = Path(sys.executable).parent / ".env"
+
+    if provider is None:
+        provider = typer.prompt(
+            "LLM provider",
+            default="anthropic",
+            prompt_suffix=" (anthropic/openai): ",
+        ).strip().lower()
+
+    if provider not in ("anthropic", "openai"):
+        console.print(f"[red]Unknown provider:[/red] {provider}. Choose 'anthropic' or 'openai'.")
+        raise typer.Exit(1)
+
+    if key is None:
+        key = typer.prompt(f"Paste your {provider} API key", hide_input=True).strip()
+
+    if not key:
+        console.print("[red]No key provided. Aborting.[/red]")
+        raise typer.Exit(1)
+
+    env_var = "ANTHROPIC_API_KEY" if provider == "anthropic" else "OPENAI_API_KEY"
+
+    # Read existing .env lines, replacing or appending the key.
+    existing: list[str] = []
+    if env_path.exists():
+        existing = env_path.read_text(encoding="utf-8").splitlines()
+
+    updated = [ln for ln in existing if not ln.startswith(f"{env_var}=")]
+    updated.append(f"{env_var}={key}")
+    env_path.write_text("\n".join(updated) + "\n", encoding="utf-8")
+    console.print(f"[green]Saved[/green] {env_var} to {env_path}")
+
+    # Verify ffmpeg.
+    ffmpeg = _find_ffmpeg()
+    if Path(ffmpeg).exists() or shutil.which(ffmpeg):
+        console.print(f"[green]ffmpeg found[/green]: {ffmpeg}")
+    else:
+        console.print(
+            "[yellow]ffmpeg not found.[/yellow] "
+            "Place ffmpeg.exe in the same folder as clipsmith.exe."
+        )
+
+    console.print("\n[bold]Ready.[/bold] Run: clipsmith process path\\to\\video.mp4")
 
 
 @app.command()
