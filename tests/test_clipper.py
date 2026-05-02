@@ -5,6 +5,7 @@ from pathlib import Path
 
 from clipsmith.clipper import (
     _build_ffmpeg_cmd,
+    _stacked_filter_complex,
     _title_slug,
     _video_filter,
 )
@@ -116,3 +117,72 @@ def test_ffmpeg_cmd_reencode_when_captions_enabled(tmp_path: Path) -> None:
     cmd = _build_ffmpeg_cmd(mp4, 10.0, 40.0, ass, ReframeConfig(mode="none"), out)
     assert "libx264" in cmd
     assert "-vf" in cmd
+
+
+# ── _stacked_filter_complex ───────────────────────────────────────────────────
+
+def _stacked_cfg(**kw) -> ReframeConfig:
+    return ReframeConfig(mode="stacked", **kw)
+
+
+def test_stacked_filter_both_rects() -> None:
+    cfg = _stacked_cfg(webcam_rect=[100, 50, 400, 300], gameplay_rect=[0, 0, 1920, 1080])
+    fc = _stacked_filter_complex(cfg, None)
+    assert "crop=400:300:100:50" in fc
+    assert "crop=1920:1080:0:0" in fc
+    assert "vstack" in fc
+    assert "[out]" in fc
+
+
+def test_stacked_filter_no_webcam_rect_falls_back_to_center_top() -> None:
+    cfg = _stacked_cfg(webcam_rect=None, gameplay_rect=[0, 0, 1920, 1080])
+    fc = _stacked_filter_complex(cfg, None)
+    chains = fc.split(";")
+    assert "crop=ih*9/16:ih" in chains[0]  # top chain uses center fallback
+
+
+def test_stacked_filter_no_gameplay_rect_falls_back_to_center_bot() -> None:
+    cfg = _stacked_cfg(webcam_rect=[0, 0, 400, 300], gameplay_rect=None)
+    fc = _stacked_filter_complex(cfg, None)
+    chains = fc.split(";")
+    assert "crop=ih*9/16:ih" in chains[1]  # bottom chain uses center fallback
+
+
+def test_stacked_filter_split_ratio_pixel_heights() -> None:
+    cfg = _stacked_cfg(split_ratio=0.4)
+    fc = _stacked_filter_complex(cfg, None)
+    assert "scale=1080:768" in fc   # int(1920 * 0.4) = 768
+    assert "scale=1080:1152" in fc  # 1920 - 768 = 1152
+
+
+def test_stacked_filter_captions_after_vstack(tmp_path: Path) -> None:
+    ass = tmp_path / "sub.ass"
+    cfg = _stacked_cfg()
+    fc = _stacked_filter_complex(cfg, ass)
+    last_chain = fc.split(";")[-1]
+    assert "vstack" in last_chain
+    assert "subtitles=" in last_chain
+
+
+def test_stacked_filter_no_captions() -> None:
+    cfg = _stacked_cfg()
+    fc = _stacked_filter_complex(cfg, None)
+    assert "subtitles=" not in fc
+    assert "[out]" in fc
+
+
+def test_ffmpeg_cmd_stacked_uses_filter_complex(tmp_path: Path) -> None:
+    mp4 = tmp_path / "v.mp4"
+    out = tmp_path / "clip.mp4"
+    cmd = _build_ffmpeg_cmd(mp4, 10.0, 40.0, None, _stacked_cfg(), out)
+    assert "-filter_complex" in cmd
+    assert "-vf" not in cmd
+    assert "libx264" in cmd
+
+
+def test_ffmpeg_cmd_stacked_maps_audio(tmp_path: Path) -> None:
+    mp4 = tmp_path / "v.mp4"
+    out = tmp_path / "clip.mp4"
+    cmd = _build_ffmpeg_cmd(mp4, 10.0, 40.0, None, _stacked_cfg(), out)
+    assert "0:a" in cmd
+    assert cmd.count("-map") >= 2

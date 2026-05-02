@@ -70,3 +70,10 @@ def test_setup_accepts_openai_provider(tmp_path, monkeypatch):
     monkeypatch.setattr("sys.executable", str(tmp_path / "clipsmith.exe"))
     result = runner.invoke(app, ["setup", "--provider", "openai", "--key", "sk-openai-test"])
     assert "OPENAI_API_KEY" in result.output
+
+
+def test_reframe_help_shows_command():
+    result = runner.invoke(app, ["reframe", "--help"])
+    assert result.exit_code == 0
+    assert "video-id" in result.output or "VIDEO_ID" in result.output
+    assert "stacked" in result.output

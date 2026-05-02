@@ -49,8 +49,10 @@ class CaptionConfig(BaseModel):
 
 
 class ReframeConfig(BaseModel):
-    mode: Literal["center", "webcam", "face", "none"] = "center"
+    mode: Literal["center", "webcam", "face", "none", "stacked"] = "center"
     webcam_rect: list[int] | None = None
+    gameplay_rect: list[int] | None = None
+    split_ratio: float = Field(default=0.4, ge=0.01, le=0.99)
 
 
 class AppConfig(BaseModel):

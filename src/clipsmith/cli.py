@@ -12,7 +12,7 @@ import typer
 from rich.console import Console
 
 from .candidates import CandidateMoment
-from .clipper import _find_ffmpeg, cut_all_clips
+from .clipper import _cut_one, _find_ffmpeg, _title_slug, cut_all_clips
 from .llm.base import ClipPick
 from .pipeline import _process_vod, _setup_logging
 from .selector import PickResult
@@ -312,6 +312,75 @@ def clip_cmd(
     console.print(f"[cyan]cutting {len(picks)} clip(s)[/cyan] -> {out_dir}")
     clip_paths = cut_all_clips(mp4_path, transcript, picks, out_dir, cfg)
     console.print(f"[green]done[/green]: {len(clip_paths)} clip(s) in {out_dir}")
+
+
+@app.command("reframe")
+def reframe_cmd(
+    video_id: str = typer.Argument(..., help="Video ID (folder name in work/ and out/)"),
+    clips: list[str] = typer.Argument(..., help="Clip identifiers e.g. clip_01 clip_03"),
+    config_path: Path = typer.Option(Path("config.yaml"), "--config", "-c"),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Re-cut selected clips in stacked layout (webcam top, gameplay bottom) -> out/<id>/stacked/."""
+    _setup_logging(verbose)
+    cfg = load_config(_resolve_config(config_path))
+    cfg.reframe.mode = "stacked"
+
+    if not cfg.reframe.webcam_rect:
+        console.print("[yellow]Warning:[/yellow] reframe.webcam_rect not set in config — top panel will use center-crop.")
+
+    work_dir = cfg.work_dir.expanduser()
+    vod_dir = work_dir / video_id
+    stacked_dir = cfg.out_dir.expanduser() / video_id / "stacked"
+
+    picks_path = vod_dir / "picks.json"
+    if not picks_path.exists():
+        console.print(f"[red]picks.json not found:[/red] {picks_path}")
+        raise typer.Exit(1)
+
+    raw = json.loads(picks_path.read_text(encoding="utf-8"))
+    all_picks = [
+        PickResult(
+            candidate=CandidateMoment(**p["candidate"]),
+            pick=ClipPick.from_dict(p["pick"]),
+        )
+        for p in raw
+    ]
+
+    transcript_path = vod_dir / "transcript.json"
+    if not transcript_path.exists():
+        console.print(f"[red]transcript.json not found:[/red] {transcript_path}")
+        raise typer.Exit(1)
+
+    from .transcribe import Transcript
+    transcript = Transcript.from_json(transcript_path.read_text(encoding="utf-8"))
+
+    mp4_path = vod_dir / f"{video_id}.mp4"
+    if not mp4_path.exists():
+        console.print(f"[red]MP4 not found:[/red] {mp4_path}")
+        raise typer.Exit(1)
+
+    # Parse clip identifiers → 1-based indices into all_picks
+    selected: list[tuple[int, PickResult]] = []
+    for ident in clips:
+        parts = ident.split("_")
+        if len(parts) < 2 or not parts[1].isdigit():
+            console.print(f"[red]Cannot parse clip number from:[/red] {ident!r}  (expected format: clip_01)")
+            raise typer.Exit(1)
+        idx = int(parts[1])
+        if idx < 1 or idx > len(all_picks):
+            console.print(f"[red]Clip index {idx} out of range[/red] (picks.json has {len(all_picks)} entries)")
+            raise typer.Exit(1)
+        selected.append((idx, all_picks[idx - 1]))
+
+    stacked_dir.mkdir(parents=True, exist_ok=True)
+    console.print(f"[cyan]cutting {len(selected)} stacked clip(s)[/cyan] -> {stacked_dir}")
+    for idx, pr in selected:
+        slug = _title_slug(pr.pick.title_es)
+        out_path = stacked_dir / f"clip_{idx:02d}_{slug}.mp4"
+        _cut_one(mp4_path, transcript, pr, idx, out_path, cfg)
+
+    console.print(f"[green]done[/green]: {len(selected)} stacked clip(s) in {stacked_dir}")
 
 
 @app.command("whoami")

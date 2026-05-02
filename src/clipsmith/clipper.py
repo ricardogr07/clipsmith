@@ -90,6 +90,8 @@ def _build_ffmpeg_cmd(
     ]
     if reframe.mode == "none" and ass_path is None:
         cmd += ["-c:v", "copy", "-c:a", "copy"]
+    elif reframe.mode == "stacked":
+        cmd += _stacked_encode_args(reframe, ass_path)
     else:
         vf = _video_filter(reframe, ass_path)
         cmd += [
@@ -119,6 +121,46 @@ def _video_filter(reframe: ReframeConfig, ass_path: Path | None) -> str:
         parts.append(f"subtitles='{ass_str}'")
 
     return ",".join(parts)
+
+
+def _stacked_filter_complex(reframe: ReframeConfig, ass_path: Path | None) -> str:
+    top_h = int(1920 * reframe.split_ratio)
+    bot_h = 1920 - top_h
+
+    if reframe.webcam_rect:
+        x, y, w, h = reframe.webcam_rect
+        top = f"[0:v]crop={w}:{h}:{x}:{y},scale=1080:{top_h}:flags=lanczos[top]"
+    else:
+        log.warning("reframe.webcam_rect not set — using center-crop for top panel")
+        top = f"[0:v]crop=ih*9/16:ih,scale=1080:{top_h}:flags=lanczos[top]"
+
+    if reframe.gameplay_rect:
+        x, y, w, h = reframe.gameplay_rect
+        bot = f"[0:v]crop={w}:{h}:{x}:{y},scale=1080:{bot_h}:flags=lanczos[bot]"
+    else:
+        bot = f"[0:v]crop=ih*9/16:ih,scale=1080:{bot_h}:flags=lanczos[bot]"
+
+    if ass_path is not None:
+        ass_str = str(ass_path).replace("\\", "/").replace(":", "\\:")
+        stack = f"[top][bot]vstack,subtitles='{ass_str}'[out]"
+    else:
+        stack = "[top][bot]vstack[out]"
+
+    return ";".join([top, bot, stack])
+
+
+def _stacked_encode_args(reframe: ReframeConfig, ass_path: Path | None) -> list[str]:
+    fc = _stacked_filter_complex(reframe, ass_path)
+    return [
+        "-filter_complex", fc,
+        "-map", "[out]",
+        "-map", "0:a",
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "23",
+        "-c:a", "aac",
+        "-b:a", "128k",
+    ]
 
 
 def _title_slug(title: str) -> str:

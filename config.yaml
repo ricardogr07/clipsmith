@@ -26,7 +26,7 @@ candidates:
   # Dedupe candidates within this window (seconds)
   dedupe_window_s: 60
   # Score per hype keyword hit found in transcript (jaja, wow, etc.)
-  transcript_hype_score: 12.0
+  transcript_hype_score: 20.0
 
 transcribe:
   # faster-whisper model: tiny | base | small | medium | large-v3
@@ -50,7 +50,14 @@ caption:
   position: bottom
 
 reframe:
-  # center | webcam (uses webcam_rect below) | face (mediapipe, future) | none (keep source resolution)
+  # center | webcam | stacked | face (future) | none
   mode: none
-  # If mode=webcam, hardcoded source-rect to crop around (in source pixels)
-  webcam_rect: null # [x, y, w, h]
+  # Top panel source crop [x, y, w, h] in source pixels (webcam/headshot)
+  # Used by: webcam mode and stacked mode (top panel)
+  webcam_rect: null
+  # Bottom panel source crop [x, y, w, h] in source pixels (gameplay area)
+  # Used by: stacked mode only. null = center-crop fallback
+  gameplay_rect: null
+  # Fraction of 1920px height for the top panel in stacked mode
+  # e.g. 0.4 → 768px webcam on top, 1152px gameplay on bottom
+  split_ratio: 0.4
