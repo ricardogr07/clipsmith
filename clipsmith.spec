@@ -30,6 +30,7 @@ a = Analysis(
         "httpx",
         "anthropic",
         "openai",
+        "ollama",       # thin HTTP client for local Ollama server — no binary data needed
         "typer",
         "rich",
         "rich.logging",
