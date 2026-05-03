@@ -13,6 +13,7 @@ from clipsmith.twitch_client import Clip
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+
 def _msg(t: float, text: str = "hey", author: str = "user", hype: int = 0) -> ChatMessage:
     return ChatMessage(
         time_in_seconds=t,
@@ -46,6 +47,7 @@ def _cfg(**overrides) -> CandidatesConfig:
 
 
 # ── density math ──────────────────────────────────────────────────────────────
+
 
 def test_density_detects_spike():
     # 50 quiet messages spread across 500s, then a burst of 40 in 15s window.
@@ -81,11 +83,12 @@ def test_density_hype_emotes_boost_score():
 
 # ── deduplication ────────────────────────────────────────────────────────────
 
+
 def test_dedupe_merges_close_events():
     raw = [
         (100.0, 10.0, "chat_density", "spike at 100"),
         (110.0, 20.0, "clip_command", "!clip at 110"),
-        (115.0, 5.0,  "chat_density", "spike at 115"),
+        (115.0, 5.0, "chat_density", "spike at 115"),
         (300.0, 15.0, "existing_clip", "clip at 300"),
     ]
     result = _dedupe(raw, window_s=60)
@@ -108,12 +111,13 @@ def test_dedupe_accumulates_scores():
 
 
 def test_dedupe_preserves_distinct_events():
-    raw = [(float(i * 100), 5.0, "chat_density", f"t={i*100}") for i in range(5)]
+    raw = [(float(i * 100), 5.0, "chat_density", f"t={i * 100}") for i in range(5)]
     result = _dedupe(raw, window_s=60)
     assert len(result) == 5
 
 
 # ── build_candidates integration ─────────────────────────────────────────────
+
 
 def test_existing_clip_gets_boost():
     cfg = _cfg(existing_clip_boost=100.0, clip_command_boost=25.0, density_peak_multiplier=99.0)
@@ -161,8 +165,10 @@ def test_no_candidates_for_completely_empty_data():
 
 # ── transcript hype signal ────────────────────────────────────────────────────
 
+
 def _transcript(segments: list[tuple[float, float, str]]):
-    from clipsmith.transcribe import Segment, Transcript, Word
+    from clipsmith.transcribe import Segment, Transcript
+
     segs = [Segment(start=s, end=e, text=t, words=[]) for s, e, t in segments]
     return Transcript(video_id="v1", language="es", segments=segs)
 
@@ -198,6 +204,8 @@ def test_transcript_hype_merges_with_clip_command():
     msgs = [_msg(100.0, "!clip")]
     tr = _transcript([(101.0, 103.0, "jajaja wow")])  # within 60s dedupe window
     candidates = build_candidates(_chat(msgs), [], cfg, transcript=tr)
-    merged = [c for c in candidates if "clip_command" in c.sources and "transcript_hype" in c.sources]
+    merged = [
+        c for c in candidates if "clip_command" in c.sources and "transcript_hype" in c.sources
+    ]
     assert merged, "clip_command and nearby transcript_hype should merge"
     assert merged[0].score > 25.0  # combined score

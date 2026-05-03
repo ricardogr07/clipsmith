@@ -32,6 +32,7 @@ dev = [
     "ruff>=0.5",
     "mypy>=1.10",
     "types-PyYAML>=6.0",
+    "pre-commit>=3.7",
 ]
 vision = [
     "opencv-python-headless>=4.9",

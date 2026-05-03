@@ -27,10 +27,15 @@ _IOU_MERGE = 0.3
 def _video_duration(mp4: Path) -> float:
     """Return video duration in seconds via ffprobe."""
     cmd = [
-        "ffprobe", "-v", "error",
-        "-select_streams", "v:0",
-        "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1",
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
         str(mp4),
     ]
     out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True).strip()
@@ -40,10 +45,16 @@ def _video_duration(mp4: Path) -> float:
 def _extract_frame(mp4: Path, t: float, out_png: Path) -> bool:
     """Extract one frame at timestamp t into out_png. Returns True on success."""
     cmd = [
-        "ffmpeg", "-y", "-ss", str(t),
-        "-i", str(mp4),
-        "-vframes", "1",
-        "-q:v", "2",
+        "ffmpeg",
+        "-y",
+        "-ss",
+        str(t),
+        "-i",
+        str(mp4),
+        "-vframes",
+        "1",
+        "-q:v",
+        "2",
         str(out_png),
     ]
     result = subprocess.run(cmd, capture_output=True)
@@ -120,7 +131,7 @@ def detect_webcam_rect(
             "Run: pip install opencv-python-headless"
         ) from exc
 
-    cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"  # type: ignore[attr-defined]
     cascade = cv2.CascadeClassifier(cascade_path)
     if cascade.empty():
         raise RuntimeError(f"Failed to load Haar cascade from {cascade_path}")
@@ -170,7 +181,12 @@ def detect_webcam_rect(
                 for x, y, w, h in faces:
                     all_rects.append((int(x), int(y), int(w), int(h)))
 
-            log.debug("t=%.1fs  faces=%d  total_rects=%d", t, len(faces) if len(faces) > 0 else 0, len(all_rects))
+            log.debug(
+                "t=%.1fs  faces=%d  total_rects=%d",
+                t,
+                len(faces) if len(faces) > 0 else 0,
+                len(all_rects),
+            )
 
     if not all_rects:
         log.warning("No faces detected in any sampled frame")
@@ -182,7 +198,8 @@ def detect_webcam_rect(
     if hit_rate < _MIN_HIT_RATE:
         log.warning(
             "Face hit rate %.0f%% below threshold %.0f%% — result may be unreliable",
-            hit_rate * 100, _MIN_HIT_RATE * 100,
+            hit_rate * 100,
+            _MIN_HIT_RATE * 100,
         )
 
     clusters = _cluster_rects(all_rects)
@@ -190,7 +207,10 @@ def detect_webcam_rect(
 
     log.info(
         "Best cluster: rect=%s  hits=%d/%d  (%.0f%%)",
-        list(best_rect), best_count, len(all_rects), best_count / len(all_rects) * 100,
+        list(best_rect),
+        best_count,
+        len(all_rects),
+        best_count / len(all_rects) * 100,
     )
 
     if len(clusters) > 1:
