@@ -1,9 +1,11 @@
-"""Combine three signals into a ranked list of CandidateMoments.
+"""Combine signals into a ranked list of CandidateMoments.
 
 Signals:
   1. Existing Twitch clips for this VOD (vod_offset as hard candidate, score boost).
   2. Chat !clip commands (viewer-driven marker).
   3. Chat density peaks + hype-emote weighting (sliding window).
+  4. Transcript hype keywords / exclamations in speech.
+  5. Audio RMS energy spikes (streamer raises voice).
 """
 
 from __future__ import annotations
@@ -19,19 +21,40 @@ from .transcribe import Transcript
 from .twitch_client import Clip
 
 # Spanish/stream hype keywords that suggest a funny or exciting moment.
-_HYPE_KEYWORDS = frozenset({
-    "jaja", "jeje", "jajaj", "jajaja", "lmao", "lol", "xd", "xdd",
-    "omg", "wow", "nooo", "noooo", "increíble", "increible", "tremendo",
-    "brutal", "dios", "wtf", "carajo", "caray", "bestia", "monstro",
-})
+_HYPE_KEYWORDS = frozenset(
+    {
+        "jaja",
+        "jeje",
+        "jajaj",
+        "jajaja",
+        "lmao",
+        "lol",
+        "xd",
+        "xdd",
+        "omg",
+        "wow",
+        "nooo",
+        "noooo",
+        "increíble",
+        "increible",
+        "tremendo",
+        "brutal",
+        "dios",
+        "wtf",
+        "carajo",
+        "caray",
+        "bestia",
+        "monstro",
+    }
+)
 
 
 @dataclass
 class CandidateMoment:
-    t_center: float          # seconds into VOD
+    t_center: float  # seconds into VOD
     score: float
-    sources: list[str]       # human-readable signal labels
-    reasons: list[str]       # detail strings for the LLM prompt
+    sources: list[str]  # human-readable signal labels
+    reasons: list[str]  # detail strings for the LLM prompt
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -44,6 +67,7 @@ def build_candidates(
     *,
     transcript: Transcript | None = None,
     vod_duration_s: float | None = None,
+    mp4_path: Path | None = None,
 ) -> list[CandidateMoment]:
     """Return CandidateMoments sorted by score descending."""
     raw: list[tuple[float, float, str, str]] = []  # (t, score, source, reason)
@@ -52,22 +76,26 @@ def build_candidates(
     for clip in existing_clips:
         if clip.vod_offset is None:
             continue
-        raw.append((
-            float(clip.vod_offset),
-            config.existing_clip_boost,
-            "existing_clip",
-            f"Twitch clip {clip.id!r} ({clip.view_count} views): {clip.title!r}",
-        ))
+        raw.append(
+            (
+                float(clip.vod_offset),
+                config.existing_clip_boost,
+                "existing_clip",
+                f"Twitch clip {clip.id!r} ({clip.view_count} views): {clip.title!r}",
+            )
+        )
 
     # --- Signal 2: !clip chat commands ---
     for msg in chat.messages:
         if msg.is_clip_command:
-            raw.append((
-                msg.time_in_seconds,
-                config.clip_command_boost,
-                "clip_command",
-                f"!clip by {msg.author} at t={msg.time_in_seconds:.1f}s",
-            ))
+            raw.append(
+                (
+                    msg.time_in_seconds,
+                    config.clip_command_boost,
+                    "clip_command",
+                    f"!clip by {msg.author} at t={msg.time_in_seconds:.1f}s",
+                )
+            )
 
     # --- Signal 3: chat density peaks ---
     density_scores = compute_density_scores(
@@ -76,12 +104,14 @@ def build_candidates(
         peak_multiplier=config.density_peak_multiplier,
     )
     for t, score in density_scores:
-        raw.append((
-            t,
-            score,
-            "chat_density",
-            f"chat density peak (score={score:.1f}) at t={t:.1f}s",
-        ))
+        raw.append(
+            (
+                t,
+                score,
+                "chat_density",
+                f"chat density peak (score={score:.1f}) at t={t:.1f}s",
+            )
+        )
 
     # --- Signal 4: transcript hype moments (laughter/exclamations in speech) ---
     if transcript is not None:
@@ -89,15 +119,34 @@ def build_candidates(
             text = seg.text.lower()
             kw_hits = sum(1 for kw in _HYPE_KEYWORDS if kw in text)
             punct_hits = text.count("!") + text.count("¡")
-            score = kw_hits * config.transcript_hype_score + punct_hits * (config.transcript_hype_score / 3)
+            score = kw_hits * config.transcript_hype_score + punct_hits * (
+                config.transcript_hype_score / 3
+            )
             if score > 0:
                 t = (seg.start + seg.end) / 2
-                raw.append((
+                raw.append(
+                    (
+                        t,
+                        score,
+                        "transcript_hype",
+                        f"hype in transcript at t={seg.start:.1f}s: {seg.text.strip()!r}",
+                    )
+                )
+
+    # --- Signal 5: audio RMS energy spikes (raised voice) ---
+    if config.audio_energy_enabled and mp4_path is not None:
+        from .audio_signal import compute_audio_rms_series, find_rms_peaks
+
+        series = compute_audio_rms_series(mp4_path, config.audio_energy_window_s)
+        for t, norm_score in find_rms_peaks(series, config.audio_energy_peak_multiplier):
+            raw.append(
+                (
                     t,
-                    score,
-                    "transcript_hype",
-                    f"hype in transcript at t={seg.start:.1f}s: {seg.text.strip()!r}",
-                ))
+                    norm_score * config.audio_energy_boost,
+                    "audio_energy",
+                    f"voice spike at {t:.1f}s ({norm_score:.1f}σ above baseline)",
+                )
+            )
 
     # --- Merge: deduplicate within dedupe_window_s, keeping max score ---
     merged = _dedupe(raw, window_s=config.dedupe_window_s)

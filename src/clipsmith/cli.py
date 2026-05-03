@@ -341,7 +341,7 @@ def run_vod(
             type="archive",
         )
         skip_download = True
-    else:
+    elif secrets.twitch_client_id and secrets.twitch_client_secret:
         with TwitchClient(secrets.twitch_client_id, secrets.twitch_client_secret) as tc:
             body = tc._get("/videos", {"id": video_id})  # noqa: SLF001
             data = body.get("data") or []
@@ -360,6 +360,21 @@ def run_vod(
             url=v["url"],
             duration=v["duration"],
             type=v["type"],
+        )
+    else:
+        console.print(
+            "[yellow]No Twitch credentials — VOD metadata unavailable, proceeding with ID only.[/yellow]"
+        )
+        video = Video(
+            id=video_id,
+            user_id="",
+            user_login="unknown",
+            title=video_id,
+            created_at="",
+            published_at="",
+            url=f"https://www.twitch.tv/videos/{video_id}",
+            duration="",
+            type="archive",
         )
 
     try:

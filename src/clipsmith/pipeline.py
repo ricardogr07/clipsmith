@@ -108,7 +108,9 @@ def _process_vod(
     console.print(f"[green]chat loaded[/green]: {len(chat.messages)} messages")
 
     console.print("[cyan]scoring candidates...[/cyan]")
-    candidates = build_candidates(chat, existing_clips, cfg.candidates, transcript=transcript)
+    candidates = build_candidates(
+        chat, existing_clips, cfg.candidates, transcript=transcript, mp4_path=mp4_path
+    )
 
     if not candidates:
         log.info("no chat signals — falling back to evenly-spaced transcript samples")

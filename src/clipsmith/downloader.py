@@ -16,11 +16,31 @@ class DownloadResult:
     mp4_path: Path
 
 
+_QUALITY_PREFERENCE = ["1080p60", "720p60", "480p", "360p", "160p"]
+
+
+def _resolve_quality(video_id: str, preferred: str) -> str:
+    """Return the best available quality, falling back through the preference list."""
+    result = subprocess.run(
+        ["python", "-m", "twitchdl", "info", video_id],
+        capture_output=True,
+        text=True,
+    )
+    output = result.stdout + result.stderr
+    if preferred in output:
+        return preferred
+    for q in _QUALITY_PREFERENCE:
+        if q in output:
+            log.info("quality '%s' not available, using '%s'", preferred, q)
+            return q
+    return preferred  # let twitchdl report the error with context
+
+
 def download_vod(
     video_id: str,
     work_dir: Path,
     *,
-    quality: str = "best",
+    quality: str = "1080p60",
     overwrite: bool = False,
 ) -> DownloadResult:
     """Download a Twitch VOD using twitch-dl.
@@ -36,10 +56,17 @@ def download_vod(
         log.info("VOD %s already downloaded: %s", video_id, out_path)
         return DownloadResult(video_id=video_id, mp4_path=out_path)
 
+    resolved = _resolve_quality(video_id, quality)
     cmd = [
-        "python", "-m", "twitchdl", "download", video_id,
-        "--quality", quality,
-        "--output", str(out_path),
+        "python",
+        "-m",
+        "twitchdl",
+        "download",
+        video_id,
+        "--quality",
+        resolved,
+        "--output",
+        str(out_path),
     ]
     if overwrite:
         cmd.append("--overwrite")

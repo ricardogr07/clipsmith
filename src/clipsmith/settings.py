@@ -25,6 +25,10 @@ class CandidatesConfig(BaseModel):
     clip_command_boost: float = 25.0
     dedupe_window_s: int = 60
     transcript_hype_score: float = 12.0
+    audio_energy_enabled: bool = True
+    audio_energy_window_s: float = 2.0
+    audio_energy_peak_multiplier: float = 2.0
+    audio_energy_boost: float = 15.0
 
 
 class TranscribeConfig(BaseModel):
