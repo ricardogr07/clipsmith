@@ -3,7 +3,7 @@
 #
 # Requirements (run once in your venv):
 #   pip install pyinstaller
-#   pip install -e .
+#   pip install -e ".[vision]"
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -11,12 +11,17 @@ $ErrorActionPreference = "Stop"
 $DIST_DIR  = "dist\clipsmith"
 $ZIP_NAME  = "dist\clipsmith-windows-x64.zip"
 
-# --- 1. Build with PyInstaller ---
+# --- 1. Ensure vision extra (opencv) is installed ---
+Write-Host "Installing vision extra (opencv)..." -ForegroundColor Cyan
+python -m pip install -e ".[vision]" --quiet
+if ($LASTEXITCODE -ne 0) { throw "pip install [vision] failed" }
+
+# --- 2. Build with PyInstaller ---
 Write-Host "Building with PyInstaller..." -ForegroundColor Cyan
 python -m PyInstaller clipsmith.spec --clean -y
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
-# --- 2. Download ffmpeg static build (gyan.dev essentials build) ---
+# --- 3. Download ffmpeg static build (gyan.dev essentials build) ---
 $FFMPEG_URL  = "https://github.com/GyanD/codexffmpeg/releases/download/7.1.1/ffmpeg-7.1.1-essentials_build.zip"
 $FFMPEG_ZIP  = "ffmpeg_tmp.zip"
 $FFMPEG_TMP  = "ffmpeg_tmp"
@@ -33,11 +38,11 @@ if (-not (Test-Path "$DIST_DIR\ffmpeg.exe")) {
     Write-Host "ffmpeg.exe already present, skipping download." -ForegroundColor DarkGray
 }
 
-# --- 3. Add user-facing files ---
+# --- 4. Add user-facing files ---
 Copy-Item ".env.example"    "$DIST_DIR\.env.example"  -Force
 Copy-Item "README_user.txt" "$DIST_DIR\README.txt"    -Force
 
-# --- 4. Zip ---
+# --- 5. Zip ---
 if (Test-Path $ZIP_NAME) { Remove-Item $ZIP_NAME }
 Write-Host "Creating $ZIP_NAME..." -ForegroundColor Cyan
 Compress-Archive -Path $DIST_DIR -DestinationPath $ZIP_NAME

@@ -11,7 +11,7 @@ datas = [("config.yaml", ".")]
 binaries = []
 hiddenimports = []
 
-for pkg in ("faster_whisper", "ctranslate2", "onnxruntime", "huggingface_hub"):
+for pkg in ("faster_whisper", "ctranslate2", "onnxruntime", "huggingface_hub", "cv2"):
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b
@@ -39,8 +39,8 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        "pandas", "scipy", "matplotlib", "sklearn", "sklearn",
-        "PIL", "cv2", "tensorflow", "torch", "torchvision",
+        "pandas", "scipy", "matplotlib", "sklearn",
+        "PIL", "tensorflow", "torch", "torchvision",
         "IPython", "ipykernel", "notebook", "jupyter",
         "pytest", "setuptools", "pip",
         "tkinter", "_tkinter", "tcl", "tk",
