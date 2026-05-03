@@ -2,7 +2,13 @@
 
 ## Overview
 
-Clipsmith turns a Twitch VOD into a set of 9:16 vertical clips with burned-in Spanish captions, ready for TikTok / YouTube Shorts. The pipeline has two entry points: a continuous **watcher** (daemon) that polls Twitch for new VODs, and a one-shot **run-vod** command for manual runs. Both feed the same five-stage pipeline.
+Clipsmith turns a Twitch VOD (or any local MP4) into a set of 9:16 vertical clips ready for TikTok / YouTube Shorts. The pipeline has three entry points:
+
+- **`watch`** — daemon that polls Twitch for new archive VODs
+- **`run-vod`** — one-shot run for a specific Twitch video ID
+- **`process`** — one-shot run from a local MP4 file
+
+All three feed the same six-stage pipeline. A separate **`reframe`** command is available as a manual post-processing step to produce stacked webcam+gameplay layouts for selected clips.
 
 ---
 
@@ -12,30 +18,42 @@ Clipsmith turns a Twitch VOD into a set of 9:16 vertical clips with burned-in Sp
 VOD (mp4)
     │
     ▼
-[1] Transcribe ──────────────── faster-whisper (Spanish, CPU int8)
-    │ transcript.json            864 segments, word timestamps
+[1] Webcam Detection ────────── opencv Haar cascade (optional, cached)
+    │ webcam_rect.json           fires only when reframe.mode != none
+    │                            and webcam_rect not already set in config
     │
     ▼
-[2] Chat Download ──────────── chat-downloader (Twitch replay API)
+[2] Transcribe ──────────────── faster-whisper (Spanish, CPU int8)
+    │ transcript.json            segments + word timestamps
+    │
+    ▼
+[3] Chat Download ──────────── chat-downloader (Twitch replay API)
     │ chat.json                  raw messages → ChatMessage (time, author, emotes)
     │                            fallback: evenly-spaced transcript samples
     │
     ▼
-[3] Candidate Scoring ────────  three signals merged & deduped
+[4] Candidate Scoring ────────  three signals merged & deduped
     │ candidates.json
     │   Signal A: existing Twitch clips  (+100 pts/clip)
     │   Signal B: !clip chat commands    (+25 pts each)
     │   Signal C: chat density peaks     (sliding window, 4× baseline)
+    │   Signal D: transcript hype words  (+20 pts/hit)
     │
     ▼
-[4] LLM Selection ────────────  one API call per candidate (top-20)
+[5] LLM Selection ────────────  one API call per candidate (top-20)
     │ picks.json                 returns: include, start_s, end_s, title_es, reason
     │   Providers: Anthropic │ OpenAI │ Ollama
     │
     ▼
-[5] Clip Cutting ─────────────  ffmpeg per pick
-    out/<vod_id>/               crop → 9:16 reframe → burned ASS captions
+[6] Clip Cutting ─────────────  ffmpeg per pick
+    out/<vod_id>/               9:16 reframe → optional burned ASS captions
     clip_01_<title>.mp4         libx264 fast / aac 128k / faststart
+
+    [manual: clipsmith reframe]
+    ▼
+[7] Stacked Reframe ──────────  ffmpeg filter_complex (human-in-the-loop)
+    out/<vod_id>/stacked/       webcam panel (top) + gameplay panel (bottom)
+    clip_01_<title>.mp4         1080×1920, split_ratio configurable
 ```
 
 ---
@@ -46,10 +64,10 @@ VOD (mp4)
 src/clipsmith/
 │
 ├── cli.py            CLI entry point (Typer)
-│     commands:  watch | run-vod | clip | whoami
+│     commands:  process | watch | run-vod | clip | reframe | detect-webcam | whoami
 │
-├── pipeline.py       Orchestrator — calls stages 1-5 in order
-│                     holds the transcript-fallback logic when chat is empty
+├── pipeline.py       Orchestrator — calls stages 1-6 in order
+│                     holds transcript-fallback logic when chat is empty
 │
 ├── watcher.py        Daemon: polls Helix every poll_interval_s seconds
 │                     emits VodEvent for each unseen archive VOD
@@ -59,6 +77,9 @@ src/clipsmith/
 ├── state.py          Persists seen video IDs to state.json between runs
 │
 ├── downloader.py     Subprocess wrapper around `python -m twitchdl download`
+│
+├── detect.py         Webcam/face detection (OpenCV Haar cascade, optional)
+│                     load_or_detect_webcam_rect: cache-first, updates cfg.reframe in-place
 │
 ├── transcribe.py     faster-whisper wrapper → Transcript(segments, words, language)
 │
@@ -77,9 +98,12 @@ src/clipsmith/
 │   └── ollama_provider.py      Local Ollama stub
 │
 ├── clipper.py        cut_all_clips: writes ASS file, runs ffmpeg per pick
+│                     modes: center | webcam | stacked | none
+│                     stacked: _stacked_filter_complex builds filter_complex chain
 ├── captions.py       Transcript → ASS subtitle file (burn-in, Spanish)
 │
 └── settings.py       AppConfig (YAML) + Secrets (.env / env vars)
+                      ReframeConfig: mode, webcam_rect, gameplay_rect, split_ratio
 ```
 
 ---
@@ -95,9 +119,12 @@ flowchart TD
     end
 
     subgraph CLI
+        PROCESS[process\nlocal mp4]
         WATCH[watch\ndaemon]
         RUNVOD[run-vod\none-shot]
         CLIP[clip\nre-cut only]
+        REFRAME[reframe\nstacked layout]
+        DETECTWC[detect-webcam\nstandalone]
     end
 
     subgraph Twitch["Twitch API (optional)"]
@@ -106,12 +133,14 @@ flowchart TD
     end
 
     subgraph Pipeline
+        DET[Detector\ndetect.py\nopencv optional]
         DL[Downloader\ndownloader.py]
         TR[Transcriber\ntranscribe.py\nfaster-whisper]
         CH[Chat\nchat.py\nchat-downloader]
         CA[Candidates\ncandidates.py\n+ candidates_math.py]
         SEL[Selector\nselector.py]
         CUT[Clipper\nclipper.py + captions.py\nffmpeg]
+        STK[Stacked Reframe\nclipper.py\nffmpeg filter_complex]
     end
 
     subgraph LLM["LLM Provider (llm/)"]
@@ -121,6 +150,7 @@ flowchart TD
     end
 
     subgraph Artifacts["work/VIDEO_ID/"]
+        WR_JSON[webcam_rect.json]
         T_JSON[transcript.json]
         C_JSON[chat.json]
         CA_JSON[candidates.json]
@@ -128,27 +158,30 @@ flowchart TD
     end
 
     subgraph Output["out/VIDEO_ID/"]
-        MP4S[clip_NN_title.mp4\n9:16 · 15-30s · burned captions]
+        MP4S[clip_NN_title.mp4\n9:16 · 15-30s]
+        STACKED[stacked/clip_NN_title.mp4\nwebcam top + gameplay bottom]
     end
 
-    CFG --> WATCH
-    CFG --> RUNVOD
-    ENV --> WATCH
-    ENV --> RUNVOD
+    CFG --> WATCH & RUNVOD & PROCESS
+    ENV --> WATCH & RUNVOD & PROCESS
 
     WATCH -->|new VOD event| Pipeline
     RUNVOD --> Pipeline
+    PROCESS --> Pipeline
     CLIP -->|picks.json exists| CUT
+    REFRAME -->|picks.json exists| STK
+    DETECTWC -->|standalone| DET
 
     HELIX -->|existing clips| CA
     TWITCHDL --> DL
     DL --> VOD
 
+    VOD --> DET
+    DET --> WR_JSON
+
     VOD --> TR
     TR --> T_JSON
-    T_JSON --> CA
-    T_JSON --> SEL
-    T_JSON --> CUT
+    T_JSON --> CA & SEL & CUT
 
     CH --> C_JSON
     C_JSON --> CA
@@ -157,11 +190,30 @@ flowchart TD
 
     SEL --> ANT & OAI & OLL
     ANT & OAI & OLL --> P_JSON
-    P_JSON --> CUT
+    P_JSON --> CUT & STK
 
-    VOD --> CUT
+    VOD --> CUT & STK
+    WR_JSON -.->|auto-loaded| STK
     CUT --> MP4S
+    STK --> STACKED
 ```
+
+---
+
+## Reframe Modes
+
+| Mode | Description |
+|------|-------------|
+| `none` | Stream-copy (no re-encode, no crop) |
+| `center` | Center-crop to 9:16 |
+| `webcam` | Crop to `webcam_rect`, scale to 1080×1920 |
+| `stacked` | Two-panel: `webcam_rect` on top, `gameplay_rect` on bottom; heights set by `split_ratio` |
+
+The `reframe` command always uses `stacked` mode regardless of the config value. The flat pipeline uses whatever `reframe.mode` is configured.
+
+### Webcam auto-detection
+
+`detect.py` samples `N` evenly-spaced frames (default 20, skipping the first/last 5% of duration), runs an OpenCV Haar frontal-face cascade on each, and clusters detections by IOU ≥ 0.3. The most-frequent cluster is returned as `[x, y, w, h]` in source-video pixels. The result is written to `work/<video_id>/webcam_rect.json` and loaded automatically on subsequent runs.
 
 ---
 
@@ -171,7 +223,8 @@ flowchart TD
 |--------|--------|-------|
 | Existing Twitch clip at this VOD offset | Helix API | +100 pts |
 | `!clip` chat command in window | Chat replay | +25 pts each |
-| Chat density peak (>4× baseline in 15s window) | Chat replay | proportional |
+| Chat density peak (>4× baseline in 15 s window) | Chat replay | proportional |
+| Transcript hype keyword (jaja, wow, etc.) | Transcript | +20 pts/hit |
 | Evenly-spaced sample (fallback, no chat data) | Transcript | 1 pt (uniform) |
 
 Candidates within 60 s of each other are merged (highest-score center kept, scores summed). Top 20 by score are sent to the LLM.
@@ -188,6 +241,8 @@ Each provider sends **two stable blocks + one variable block** to maximise promp
 
 The LLM returns a single JSON object: `{ include, start_offset_s, end_offset_s, title_es, reason }`.
 
+`start_offset_s` and `end_offset_s` are **absolute timestamps** from the start of the VOD (not offsets from `t_center`).
+
 ---
 
 ## File Layout
@@ -200,6 +255,7 @@ clipsmith/
 ├── work/
 │   └── <video_id>/
 │       ├── <video_id>.mp4
+│       ├── webcam_rect.json    (auto-detected, cached)
 │       ├── transcript.json
 │       ├── chat.json
 │       ├── candidates.json
@@ -208,5 +264,8 @@ clipsmith/
     └── <video_id>/
         ├── clip_01_<title>.mp4
         ├── clip_01_<title>.ass
-        └── ...
+        ├── ...
+        └── stacked/
+            ├── clip_01_<title>.mp4
+            └── ...
 ```
