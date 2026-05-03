@@ -34,13 +34,19 @@ transcribe:
   # int8 is the recommended CPU quantization
   compute_type: int8
   language: es
+  # Parallel chunked transcription (recommended for streams > 1 hr on CPU)
+  # chunk_minutes: 30    # split into 30-min chunks transcribed concurrently
+  # chunk_overlap_s: 30  # overlap between chunks to avoid cutting words at boundaries
+  # max_workers: 4       # number of parallel transcription threads
 
 llm:
   # provider: openai | anthropic | ollama
   provider: anthropic
   model_anthropic: claude-sonnet-4-6
   model_openai: gpt-4.1
-  model_ollama: llama3.1
+  # Free local option: pip install ".[ollama]" then: ollama pull llama3.1:8b
+  #provider: ollama
+  #model_ollama: llama3.1:8b
 
 caption:
   enabled: false  # set true to burn subtitles into the video

@@ -37,6 +37,9 @@ dev = [
 vision = [
     "opencv-python-headless>=4.9",
 ]
+ollama = [
+    "ollama>=0.3",
+]
 
 [project.scripts]
 clipsmith = "clipsmith.cli:app"

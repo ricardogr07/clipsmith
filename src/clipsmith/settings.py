@@ -31,19 +31,22 @@ class TranscribeConfig(BaseModel):
     model: str = "medium"
     compute_type: str = "int8"
     language: str = "es"
+    chunk_minutes: int = 0  # 0 = disabled; >0 splits audio into N-minute chunks
+    chunk_overlap_s: int = 30  # overlap between adjacent chunks to avoid boundary word loss
+    max_workers: int = 4  # ThreadPoolExecutor concurrency for parallel transcription
 
 
 class LLMConfig(BaseModel):
     provider: Literal["openai", "anthropic", "ollama"] = "anthropic"
     model_anthropic: str = "claude-sonnet-4-6"
     model_openai: str = "gpt-4.1"
-    model_ollama: str = "llama3.1"
+    model_ollama: str = "llama3.1:8b"
 
 
 class CaptionConfig(BaseModel):
     enabled: bool = False
     font: str = "Arial"
-    font_size: int = 72   # ASS pts at 1080×1920; 72 ≈ TikTok-style captions
+    font_size: int = 72  # ASS pts at 1080×1920; 72 ≈ TikTok-style captions
     outline: int = 3
     position: str = "bottom"
 
