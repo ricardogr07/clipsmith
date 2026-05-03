@@ -42,6 +42,7 @@ def _process_vod(
     skip_clip: bool = False,
     provider: str | None = None,
     max_candidates: int = 20,
+    start_s: float = 0.0,
 ) -> None:
     """Run the full pipeline for one VOD: download → transcribe → candidates → select → clip."""
     video_id = video.id
@@ -72,6 +73,9 @@ def _process_vod(
 
     load_or_detect_webcam_rect(mp4_path, vod_dir, cfg.reframe)
 
+    if start_s > 0:
+        console.print(f"[dim]start offset:[/dim] {start_s:.0f}s — pregame content will be skipped")
+
     console.print(f"[cyan]transcribing[/cyan] {mp4_path.name} ...")
     transcript = transcribe(
         mp4_path,
@@ -79,6 +83,15 @@ def _process_vod(
         cfg.transcribe,
         overwrite=not skip_transcribe,
     )
+    if start_s > 0:
+        before = len(transcript.segments)
+        transcript.segments = [s for s in transcript.segments if s.start >= start_s]
+        log.info(
+            "trimmed transcript: %d → %d segments (start_s=%.0f)",
+            before,
+            len(transcript.segments),
+            start_s,
+        )
     console.print(
         f"[green]transcript done[/green]: {len(transcript.segments)} segments, "
         f"language={transcript.language}"
@@ -86,6 +99,12 @@ def _process_vod(
 
     console.print("[cyan]downloading chat...[/cyan]")
     chat = download_chat(video_id, work_dir, overwrite=not skip_chat)
+    if start_s > 0:
+        before = len(chat.messages)
+        chat.messages = [m for m in chat.messages if m.time_in_seconds >= start_s]
+        log.info(
+            "trimmed chat: %d → %d messages (start_s=%.0f)", before, len(chat.messages), start_s
+        )
     console.print(f"[green]chat loaded[/green]: {len(chat.messages)} messages")
 
     console.print("[cyan]scoring candidates...[/cyan]")
@@ -111,8 +130,7 @@ def _process_vod(
     console.print(f"[green]candidates[/green]: {len(candidates)} moments")
     for i, c in enumerate(candidates[:10], 1):
         console.print(
-            f"  #{i:2d}  t={c.t_center:7.1f}s  score={c.score:6.1f}  "
-            f"signals={','.join(c.sources)}"
+            f"  #{i:2d}  t={c.t_center:7.1f}s  score={c.score:6.1f}  signals={','.join(c.sources)}"
         )
 
     if skip_select:
@@ -123,8 +141,7 @@ def _process_vod(
         cfg.llm.provider = provider  # type: ignore[assignment]
 
     console.print(
-        f"[cyan]selecting clips[/cyan] via {cfg.llm.provider} "
-        f"(top {max_candidates} candidates)..."
+        f"[cyan]selecting clips[/cyan] via {cfg.llm.provider} (top {max_candidates} candidates)..."
     )
     picker = get_provider(cfg, secrets)
     stream_context = build_stream_context(
@@ -133,7 +150,11 @@ def _process_vod(
         vod_duration=video.duration,
     )
     picks = select_clips(
-        candidates, transcript, picker, stream_context, cfg.clip,
+        candidates,
+        transcript,
+        picker,
+        stream_context,
+        cfg.clip,
         max_candidates=max_candidates,
     )
     picks_path = vod_dir / "picks.json"

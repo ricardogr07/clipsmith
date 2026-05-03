@@ -37,14 +37,42 @@ def _resolve_config(explicit: Path) -> Path:
     return explicit
 
 
+def _parse_start_at(value: str | None) -> float:
+    """Parse --start-at value to seconds. Accepts 'MM:SS', 'H:MM:SS', or plain seconds."""
+    if value is None:
+        return 0.0
+    parts = value.strip().split(":")
+    try:
+        if len(parts) == 1:
+            return float(parts[0])
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + float(parts[1])
+        if len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+    except ValueError:
+        pass
+    raise typer.BadParameter(f"Cannot parse time {value!r}. Use MM:SS, H:MM:SS, or seconds.")
+
+
 @app.command()
 def process(
     mp4: Path = typer.Argument(..., help="Path to a local MP4 file to process"),
     config_path: Path = typer.Option(Path("config.yaml"), "--config", "-c"),
-    provider: str | None = typer.Option(None, "--provider", help="Override LLM provider (anthropic|openai)"),
-    captions: bool | None = typer.Option(None, "--captions/--no-captions", help="Burn captions into video (overrides config)"),
-    reframe: bool | None = typer.Option(None, "--reframe/--no-reframe", help="Reframe to 9:16 vertical (overrides config)"),
-    skip_transcribe: bool = typer.Option(False, "--skip-transcribe", help="Use cached transcript.json if it exists"),
+    provider: str | None = typer.Option(
+        None, "--provider", help="Override LLM provider (anthropic|openai)"
+    ),
+    captions: bool | None = typer.Option(
+        None, "--captions/--no-captions", help="Burn captions into video (overrides config)"
+    ),
+    reframe: bool | None = typer.Option(
+        None, "--reframe/--no-reframe", help="Reframe to 9:16 vertical (overrides config)"
+    ),
+    skip_transcribe: bool = typer.Option(
+        False, "--skip-transcribe", help="Use cached transcript.json if it exists"
+    ),
+    start_at: str | None = typer.Option(
+        None, "--start-at", help="Skip content before this timestamp (MM:SS, H:MM:SS, or seconds)"
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Process a local MP4 through the full pipeline: transcribe -> LLM -> clips."""
@@ -92,11 +120,14 @@ def process(
 
     try:
         _process_vod(
-            video, cfg, secrets,
+            video,
+            cfg,
+            secrets,
             skip_download=True,
             skip_transcribe=skip_transcribe,
             skip_chat=True,
             provider=provider,
+            start_s=_parse_start_at(start_at),
         )
     except FileNotFoundError as exc:
         console.print(f"[red]{exc}[/red]")
@@ -105,18 +136,26 @@ def process(
 
 @app.command()
 def setup(
-    provider: str | None = typer.Option(None, "--provider", help="LLM provider: anthropic or openai"),
-    key: str | None = typer.Option(None, "--key", help="API key (omit to be prompted interactively)"),
+    provider: str | None = typer.Option(
+        None, "--provider", help="LLM provider: anthropic or openai"
+    ),
+    key: str | None = typer.Option(
+        None, "--key", help="API key (omit to be prompted interactively)"
+    ),
 ) -> None:
     """First-run wizard: save your API key and verify ffmpeg is available."""
     env_path = Path(sys.executable).parent / ".env"
 
     if provider is None:
-        provider = typer.prompt(
-            "LLM provider",
-            default="anthropic",
-            prompt_suffix=" (anthropic/openai): ",
-        ).strip().lower()
+        provider = (
+            typer.prompt(
+                "LLM provider",
+                default="anthropic",
+                prompt_suffix=" (anthropic/openai): ",
+            )
+            .strip()
+            .lower()
+        )
 
     if provider not in ("anthropic", "openai"):
         console.print(f"[red]Unknown provider:[/red] {provider}. Choose 'anthropic' or 'openai'.")
@@ -187,16 +226,33 @@ def watch(
 def run_vod(
     video_id: str = typer.Argument(..., help="Twitch video (VOD) id"),
     config_path: Path = typer.Option(Path("config.yaml"), "--config", "-c"),
-    local: bool = typer.Option(False, "--local", help="Skip all Twitch API calls; use manually placed mp4"),
-    skip_download: bool = typer.Option(False, "--skip-download", help="Use existing mp4 in work dir"),
-    skip_transcribe: bool = typer.Option(False, "--skip-transcribe", help="Use cached transcript.json"),
+    local: bool = typer.Option(
+        False, "--local", help="Skip all Twitch API calls; use manually placed mp4"
+    ),
+    skip_download: bool = typer.Option(
+        False, "--skip-download", help="Use existing mp4 in work dir"
+    ),
+    skip_transcribe: bool = typer.Option(
+        False, "--skip-transcribe", help="Use cached transcript.json"
+    ),
     skip_chat: bool = typer.Option(False, "--skip-chat", help="Use cached chat.json"),
     skip_select: bool = typer.Option(False, "--skip-select", help="Skip LLM selection step"),
     skip_clip: bool = typer.Option(False, "--skip-clip", help="Skip ffmpeg clipping step"),
-    provider: str | None = typer.Option(None, "--provider", help="Override LLM provider (anthropic|openai)"),
-    captions: bool | None = typer.Option(None, "--captions/--no-captions", help="Burn captions into video (overrides config)"),
-    reframe: bool | None = typer.Option(None, "--reframe/--no-reframe", help="Reframe to 9:16 vertical (overrides config)"),
-    max_candidates: int = typer.Option(20, "--max-candidates", help="Max candidates to send to LLM"),
+    provider: str | None = typer.Option(
+        None, "--provider", help="Override LLM provider (anthropic|openai)"
+    ),
+    captions: bool | None = typer.Option(
+        None, "--captions/--no-captions", help="Burn captions into video (overrides config)"
+    ),
+    reframe: bool | None = typer.Option(
+        None, "--reframe/--no-reframe", help="Reframe to 9:16 vertical (overrides config)"
+    ),
+    max_candidates: int = typer.Option(
+        20, "--max-candidates", help="Max candidates to send to LLM"
+    ),
+    start_at: str | None = typer.Option(
+        None, "--start-at", help="Skip content before this timestamp (MM:SS, H:MM:SS, or seconds)"
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Download, transcribe, score candidates, and select clips via LLM."""
@@ -247,7 +303,9 @@ def run_vod(
 
     try:
         _process_vod(
-            video, cfg, secrets,
+            video,
+            cfg,
+            secrets,
             skip_download=skip_download,
             skip_transcribe=skip_transcribe,
             skip_chat=skip_chat,
@@ -255,6 +313,7 @@ def run_vod(
             skip_clip=skip_clip,
             provider=provider,
             max_candidates=max_candidates,
+            start_s=_parse_start_at(start_at),
         )
     except FileNotFoundError as exc:
         console.print(f"[red]{exc}[/red]")
@@ -265,8 +324,12 @@ def run_vod(
 def clip_cmd(
     video_id: str = typer.Argument(..., help="Twitch video (VOD) id"),
     config_path: Path = typer.Option(Path("config.yaml"), "--config", "-c"),
-    captions: bool | None = typer.Option(None, "--captions/--no-captions", help="Burn captions into video (overrides config)"),
-    reframe: bool | None = typer.Option(None, "--reframe/--no-reframe", help="Reframe to 9:16 vertical (overrides config)"),
+    captions: bool | None = typer.Option(
+        None, "--captions/--no-captions", help="Burn captions into video (overrides config)"
+    ),
+    reframe: bool | None = typer.Option(
+        None, "--reframe/--no-reframe", help="Reframe to 9:16 vertical (overrides config)"
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Re-run the ffmpeg clipper from an existing picks.json (no LLM re-call)."""
@@ -327,7 +390,9 @@ def reframe_cmd(
     cfg.reframe.mode = "stacked"
 
     if not cfg.reframe.webcam_rect:
-        console.print("[yellow]Warning:[/yellow] reframe.webcam_rect not set in config — top panel will use center-crop.")
+        console.print(
+            "[yellow]Warning:[/yellow] reframe.webcam_rect not set in config — top panel will use center-crop."
+        )
 
     work_dir = cfg.work_dir.expanduser()
     vod_dir = work_dir / video_id
@@ -353,6 +418,7 @@ def reframe_cmd(
         raise typer.Exit(1)
 
     from .transcribe import Transcript
+
     transcript = Transcript.from_json(transcript_path.read_text(encoding="utf-8"))
 
     mp4_path = vod_dir / f"{video_id}.mp4"
@@ -361,6 +427,7 @@ def reframe_cmd(
         raise typer.Exit(1)
 
     from .detect import load_or_detect_webcam_rect
+
     load_or_detect_webcam_rect(mp4_path, vod_dir, cfg.reframe)
 
     # Parse clip identifiers → 1-based indices into all_picks
@@ -368,11 +435,15 @@ def reframe_cmd(
     for ident in clips:
         parts = ident.split("_")
         if len(parts) < 2 or not parts[1].isdigit():
-            console.print(f"[red]Cannot parse clip number from:[/red] {ident!r}  (expected format: clip_01)")
+            console.print(
+                f"[red]Cannot parse clip number from:[/red] {ident!r}  (expected format: clip_01)"
+            )
             raise typer.Exit(1)
         idx = int(parts[1])
         if idx < 1 or idx > len(all_picks):
-            console.print(f"[red]Clip index {idx} out of range[/red] (picks.json has {len(all_picks)} entries)")
+            console.print(
+                f"[red]Clip index {idx} out of range[/red] (picks.json has {len(all_picks)} entries)"
+            )
             raise typer.Exit(1)
         selected.append((idx, all_picks[idx - 1]))
 
@@ -402,6 +473,7 @@ def whoami(
 def _patch_webcam_rect_in_config(config_path: Path, rect: list[int]) -> None:
     """Replace the webcam_rect line in config.yaml in-place, preserving all other content."""
     import re
+
     rect_str = f"[{', '.join(str(v) for v in rect)}]"
     text = config_path.read_text(encoding="utf-8")
     new_line = f"  webcam_rect: {rect_str}"
@@ -437,6 +509,7 @@ def detect_webcam_cmd(
     console.print(f"[cyan]Sampling {samples} frames from[/cyan] {mp4.name} ...")
 
     from .detect import detect_webcam_rect
+
     try:
         rect = detect_webcam_rect(mp4, sample_count=samples)
     except RuntimeError as exc:
