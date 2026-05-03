@@ -10,6 +10,7 @@ from rich.logging import RichHandler
 from .candidates import CandidateMoment, build_candidates, save_candidates
 from .chat import download_chat
 from .clipper import cut_all_clips
+from .detect import load_or_detect_webcam_rect
 from .downloader import download_vod
 from .llm import get_provider
 from .selector import build_stream_context, save_picks, select_clips
@@ -68,6 +69,8 @@ def _process_vod(
         mp4_path = vod_dir / f"{video_id}.mp4"
         if not mp4_path.exists():
             raise FileNotFoundError(f"Expected MP4 not found: {mp4_path}")
+
+    load_or_detect_webcam_rect(mp4_path, vod_dir, cfg.reframe)
 
     console.print(f"[cyan]transcribing[/cyan] {mp4_path.name} ...")
     transcript = transcribe(

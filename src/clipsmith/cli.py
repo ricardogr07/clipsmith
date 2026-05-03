@@ -360,6 +360,9 @@ def reframe_cmd(
         console.print(f"[red]MP4 not found:[/red] {mp4_path}")
         raise typer.Exit(1)
 
+    from .detect import load_or_detect_webcam_rect
+    load_or_detect_webcam_rect(mp4_path, vod_dir, cfg.reframe)
+
     # Parse clip identifiers → 1-based indices into all_picks
     selected: list[tuple[int, PickResult]] = []
     for ident in clips:
@@ -394,6 +397,48 @@ def whoami(
     with TwitchClient(secrets.twitch_client_id, secrets.twitch_client_secret) as tc:
         user_id = tc.get_user_id(login)
         console.print(f"{login} -> user_id={user_id}")
+
+
+@app.command("detect-webcam")
+def detect_webcam_cmd(
+    video_id: str = typer.Argument(..., help="Video ID (folder name in work/)"),
+    config_path: Path = typer.Option(Path("config.yaml"), "--config", "-c"),
+    samples: int = typer.Option(20, "--samples", help="Number of frames to sample"),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Auto-detect the webcam/face rectangle from sampled frames using Haar cascade detection."""
+    _setup_logging(verbose)
+    cfg = load_config(_resolve_config(config_path))
+    mp4 = cfg.work_dir.expanduser() / video_id / f"{video_id}.mp4"
+
+    if not mp4.exists():
+        console.print(f"[red]MP4 not found:[/red] {mp4}")
+        raise typer.Exit(1)
+
+    console.print(f"[cyan]Sampling {samples} frames from[/cyan] {mp4.name} ...")
+
+    from .detect import detect_webcam_rect
+    try:
+        rect = detect_webcam_rect(mp4, sample_count=samples)
+    except RuntimeError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1)
+
+    if rect is None:
+        console.print(
+            "[yellow]No stable face detected.[/yellow] "
+            "Try --samples 40, or set webcam_rect manually in config.yaml."
+        )
+        raise typer.Exit(1)
+
+    x, y, w, h = rect
+    console.print(f"\n[green]Detected webcam rect:[/green]  x={x}  y={y}  w={w}  h={h}")
+    console.print("\n[bold]Paste into config.yaml:[/bold]")
+    console.print(f"  webcam_rect: [{x}, {y}, {w}, {h}]")
+    console.print(
+        "\n[dim]Tip: increase w/h by ~20% to add padding around the face, "
+        "then re-run `clipsmith reframe` to verify.[/dim]"
+    )
 
 
 if __name__ == "__main__":

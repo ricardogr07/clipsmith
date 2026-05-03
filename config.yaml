@@ -54,10 +54,10 @@ reframe:
   mode: none
   # Top panel source crop [x, y, w, h] in source pixels (webcam/headshot)
   # Used by: webcam mode and stacked mode (top panel)
-  webcam_rect: null
+  webcam_rect: [5, 525, 265, 155]    # full webcam box (auto-detected + measured)
   # Bottom panel source crop [x, y, w, h] in source pixels (gameplay area)
   # Used by: stacked mode only. null = center-crop fallback
-  gameplay_rect: null
+  gameplay_rect: [270, 0, 1010, 682]  # game right of webcam column, no UI bar
   # Fraction of 1920px height for the top panel in stacked mode
   # e.g. 0.4 → 768px webcam on top, 1152px gameplay on bottom
   split_ratio: 0.4
