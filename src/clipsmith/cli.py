@@ -399,6 +399,25 @@ def whoami(
         console.print(f"{login} -> user_id={user_id}")
 
 
+def _patch_webcam_rect_in_config(config_path: Path, rect: list[int]) -> None:
+    """Replace the webcam_rect line in config.yaml in-place, preserving all other content."""
+    import re
+    rect_str = f"[{', '.join(str(v) for v in rect)}]"
+    text = config_path.read_text(encoding="utf-8")
+    new_line = f"  webcam_rect: {rect_str}"
+    # Replace existing webcam_rect line (with optional trailing comment)
+    patched, n = re.subn(r"^(\s*webcam_rect\s*:).*$", new_line, text, flags=re.MULTILINE)
+    if n == 0:
+        # Field absent — insert after the 'reframe:' key line
+        patched = re.sub(
+            r"^(reframe\s*:.*)$",
+            rf"\1\n{new_line}",
+            text,
+            flags=re.MULTILINE,
+        )
+    config_path.write_text(patched, encoding="utf-8")
+
+
 @app.command("detect-webcam")
 def detect_webcam_cmd(
     video_id: str = typer.Argument(..., help="Video ID (folder name in work/)"),
@@ -433,8 +452,10 @@ def detect_webcam_cmd(
 
     x, y, w, h = rect
     console.print(f"\n[green]Detected webcam rect:[/green]  x={x}  y={y}  w={w}  h={h}")
-    console.print("\n[bold]Paste into config.yaml:[/bold]")
-    console.print(f"  webcam_rect: [{x}, {y}, {w}, {h}]")
+
+    resolved = _resolve_config(config_path)
+    _patch_webcam_rect_in_config(resolved, rect)
+    console.print(f"[green]Saved[/green] webcam_rect to {resolved}")
     console.print(
         "\n[dim]Tip: increase w/h by ~20% to add padding around the face, "
         "then re-run `clipsmith reframe` to verify.[/dim]"

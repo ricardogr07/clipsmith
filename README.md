@@ -150,13 +150,13 @@ Output goes to `out/<video_id>/stacked/`. The reframe rects come from `config.ya
 
 If `reframe.webcam_rect` is not set in `config.yaml`, clipsmith will try to detect the face rectangle automatically using OpenCV (requires `pip install -e ".[vision]"`). The result is cached to `work/<video_id>/webcam_rect.json` and reused on subsequent runs.
 
-To run detection manually and preview the result:
+To run detection manually and write the result directly into `config.yaml`:
 
 ```sh
 clipsmith detect-webcam <video_id>
 ```
 
-This prints the detected rect and a ready-to-paste `config.yaml` snippet.
+This samples frames, detects the webcam rectangle, and saves `reframe.webcam_rect` in `config.yaml` automatically — no manual copy-paste needed.
 
 ### Sanity check
 

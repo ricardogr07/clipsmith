@@ -38,13 +38,13 @@ download; subsequent runs use the cached copy.
 WEBCAM AUTO-DETECTION
 ---------------------
 clipsmith can automatically find your webcam rectangle in the video using
-face detection.  To run it manually:
+face detection.  To run it:
 
      clipsmith detect-webcam <video_id>
 
-This prints the detected coordinates and a ready-to-paste snippet for
-config.yaml.  Detection also runs automatically during processing if
-webcam_rect is not set in config.yaml.
+This detects the webcam position and saves it directly into config.yaml —
+no copy-pasting required.  Detection also runs automatically during
+processing if webcam_rect is not set in config.yaml.
 
 CHANGING SETTINGS
 -----------------
