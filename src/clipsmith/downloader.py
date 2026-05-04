@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-import subprocess
+import subprocess  # nosec B403
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,7 +21,7 @@ _QUALITY_PREFERENCE = ["1080p60", "720p60", "480p", "360p", "160p"]
 
 def _resolve_quality(video_id: str, preferred: str) -> str:
     """Return the best available quality, falling back through the preference list."""
-    result = subprocess.run(
+    result = subprocess.run(  # nosec B603 — invoking twitchdl module; video_id is a numeric string from Twitch API
         ["python", "-m", "twitchdl", "info", video_id],
         capture_output=True,
         text=True,
@@ -72,6 +72,6 @@ def download_vod(
         cmd.append("--overwrite")
 
     log.info("running: %s", " ".join(cmd))
-    subprocess.run(cmd, check=True, text=True, capture_output=False)
+    subprocess.run(cmd, check=True, text=True, capture_output=False)  # nosec B603 — cmd built from internal config values and Twitch video_id
     log.info("download finished: %s", out_path)
     return DownloadResult(video_id=video_id, mp4_path=out_path)

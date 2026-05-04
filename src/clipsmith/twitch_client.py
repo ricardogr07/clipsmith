@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 
 HELIX = "https://api.twitch.tv/helix"
-OAUTH_TOKEN_URL = "https://id.twitch.tv/oauth2/token"
+OAUTH_TOKEN_URL = "https://id.twitch.tv/oauth2/token"  # nosec B105 — public OAuth endpoint URL, not a credential
 
 
 @dataclass

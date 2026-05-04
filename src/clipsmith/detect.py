@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-import subprocess
+import subprocess  # nosec B403
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -38,7 +38,7 @@ def _video_duration(mp4: Path) -> float:
         "default=noprint_wrappers=1:nokey=1",
         str(mp4),
     ]
-    out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True).strip()
+    out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True).strip()  # nosec B603 — cmd contains only internal paths and ffprobe flags
     return float(out)
 
 
@@ -57,7 +57,7 @@ def _extract_frame(mp4: Path, t: float, out_png: Path) -> bool:
         "2",
         str(out_png),
     ]
-    result = subprocess.run(cmd, capture_output=True)
+    result = subprocess.run(cmd, capture_output=True)  # nosec B603 — cmd contains only internal paths and ffmpeg flags
     return result.returncode == 0 and out_png.exists()
 
 

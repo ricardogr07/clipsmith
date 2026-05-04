@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import json
 import logging
-import subprocess
+import subprocess  # nosec B403
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 from .settings import TranscribeConfig
 
@@ -42,7 +42,7 @@ class Transcript:
         return json.dumps(asdict(self), ensure_ascii=False, indent=2)
 
     @classmethod
-    def from_json(cls, text: str) -> "Transcript":
+    def from_json(cls: type[Self], text: str) -> Self:
         d = json.loads(text)
         d["segments"] = [
             Segment(
@@ -74,7 +74,7 @@ def _extract_audio_chunk(mp4: Path, start_s: float, duration_s: float, out_wav: 
         "1",
         str(out_wav),
     ]
-    subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # nosec B603 — cmd built from internal paths and config values only
 
 
 def _transcribe_chunk(

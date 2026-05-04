@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 import re
-import subprocess
+import shutil
+import subprocess  # nosec B403
 import sys
 import unicodedata
 from pathlib import Path
@@ -22,7 +23,10 @@ def _find_ffmpeg() -> str:
     bundled = Path(sys.executable).parent / "ffmpeg.exe"
     if bundled.exists():
         return str(bundled)
-    return "ffmpeg"
+    path = shutil.which("ffmpeg")
+    if path is None:
+        raise RuntimeError("ffmpeg not found on PATH")
+    return path
 
 
 def cut_all_clips(
@@ -63,7 +67,7 @@ def _cut_one(
     log.debug("ffmpeg: %s", " ".join(cmd))
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True)  # nosec B603 — cmd built internally by _build_ffmpeg_cmd
     except FileNotFoundError:
         raise RuntimeError(
             "ffmpeg not found. Place ffmpeg.exe next to clipsmith.exe or add it to PATH."
@@ -83,10 +87,14 @@ def _build_ffmpeg_cmd(
     out_path: Path,
 ) -> list[str]:
     cmd = [
-        _find_ffmpeg(), "-y",
-        "-ss", f"{start:.3f}",
-        "-i", str(mp4_path),
-        "-t", f"{end - start:.3f}",
+        _find_ffmpeg(),
+        "-y",
+        "-ss",
+        f"{start:.3f}",
+        "-i",
+        str(mp4_path),
+        "-t",
+        f"{end - start:.3f}",
     ]
     if reframe.mode == "none" and ass_path is None:
         cmd += ["-c:v", "copy", "-c:a", "copy"]
@@ -95,12 +103,18 @@ def _build_ffmpeg_cmd(
     else:
         vf = _video_filter(reframe, ass_path)
         cmd += [
-            "-vf", vf,
-            "-c:v", "libx264",
-            "-preset", "fast",
-            "-crf", "23",
-            "-c:a", "aac",
-            "-b:a", "128k",
+            "-vf",
+            vf,
+            "-c:v",
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "23",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
         ]
     cmd += ["-movflags", "+faststart", str(out_path)]
     return cmd
@@ -152,14 +166,22 @@ def _stacked_filter_complex(reframe: ReframeConfig, ass_path: Path | None) -> st
 def _stacked_encode_args(reframe: ReframeConfig, ass_path: Path | None) -> list[str]:
     fc = _stacked_filter_complex(reframe, ass_path)
     return [
-        "-filter_complex", fc,
-        "-map", "[out]",
-        "-map", "0:a",
-        "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "23",
-        "-c:a", "aac",
-        "-b:a", "128k",
+        "-filter_complex",
+        fc,
+        "-map",
+        "[out]",
+        "-map",
+        "0:a",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "fast",
+        "-crf",
+        "23",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
     ]
 
 
