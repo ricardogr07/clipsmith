@@ -24,14 +24,14 @@ candidates:
   # Boost per `!clip` chat message in the window
   clip_command_boost: 25.0
   # Dedupe candidates within this window (seconds)
-  dedupe_window_s: 60
+  dedupe_window_s: 30
   # Score per hype keyword hit found in transcript (jaja, wow, etc.)
   transcript_hype_score: 20.0
   # Audio RMS energy spikes — fires when the streamer clearly raises their voice
-  # audio_energy_enabled: true
-  # audio_energy_window_s: 2.0         # RMS window size in seconds
-  # audio_energy_peak_multiplier: 2.0  # threshold = mean + N*std (higher = fewer peaks)
-  # audio_energy_boost: 15.0           # score multiplier per peak
+  audio_energy_enabled: true
+  audio_energy_window_s: 2.0         # RMS window size in seconds
+  audio_energy_peak_multiplier: 2.0  # threshold = mean + N*std (higher = fewer peaks)
+  audio_energy_boost: 15.0           # score multiplier per peak
 
 transcribe:
   # faster-whisper model: tiny | base | small | medium | large-v3

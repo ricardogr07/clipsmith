@@ -137,7 +137,9 @@ def build_candidates(
     if config.audio_energy_enabled and mp4_path is not None:
         from .audio_signal import compute_audio_rms_series, find_rms_peaks
 
-        series = compute_audio_rms_series(mp4_path, config.audio_energy_window_s)
+        series = compute_audio_rms_series(
+            mp4_path, config.audio_energy_window_s, cache_dir=mp4_path.parent
+        )
         for t, norm_score in find_rms_peaks(series, config.audio_energy_peak_multiplier):
             raw.append(
                 (

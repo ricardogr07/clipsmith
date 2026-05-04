@@ -50,7 +50,11 @@ def select_clips(
     for i, candidate in enumerate(top, 1):
         log.info(
             "LLM candidate %d/%d  t=%.1f  score=%.1f  signals=%s",
-            i, len(top), candidate.t_center, candidate.score, candidate.sources,
+            i,
+            len(top),
+            candidate.t_center,
+            candidate.score,
+            candidate.sources,
         )
         window = _extract_transcript_window(transcript, candidate.t_center)
         pick = picker.pick(window, candidate, stream_context)
@@ -64,7 +68,10 @@ def select_clips(
         pick = _clamp_duration(pick, config)
         log.info(
             "  accepted: [%.1f-%.1f] (%.1fs) - %s",
-            pick.start_offset_s, pick.end_offset_s, pick.duration_s, pick.title_es,
+            pick.start_offset_s,
+            pick.end_offset_s,
+            pick.duration_s,
+            pick.title_es.encode("ascii", "replace").decode("ascii"),
         )
         picks.append(PickResult(candidate=candidate, pick=pick))
 

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
-import subprocess
+import subprocess  # nosec B403
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -13,11 +14,25 @@ log = logging.getLogger(__name__)
 def compute_audio_rms_series(
     mp4: Path,
     window_s: float = 2.0,
+    *,
+    cache_dir: Path | None = None,
 ) -> list[tuple[float, float]]:
     """Return (t_center, rms_db) per analysis window. Skips silence (db <= -90).
 
+    Results are cached to <cache_dir>/audio_rms.json so the expensive ffmpeg
+    scan only runs once per VOD. Pass cache_dir=None to disable caching.
     Uses ffmpeg astats + ametadata filters — no Python audio library required.
     """
+    cache_path = (cache_dir / "audio_rms.json") if cache_dir is not None else None
+
+    if cache_path is not None and cache_path.exists():
+        data = json.loads(cache_path.read_text(encoding="utf-8"))
+        points: list[tuple[float, float]] = [tuple(p) for p in data]  # type: ignore[misc]
+        log.info(
+            "audio RMS series: loaded %d windows from cache (%s)", len(points), cache_path.name
+        )
+        return points
+
     sample_rate = 16000
     reset_samples = int(window_s * sample_rate)
     cmd = [
@@ -33,8 +48,8 @@ def compute_audio_rms_series(
         "null",
         "-",
     ]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
-    points: list[tuple[float, float]] = []
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)  # nosec B603 — cmd built from internal config and mp4 path only
+    points = []
     for m in re.finditer(
         r"pts_time:(\S+).*?lavfi\.astats\.Overall\.RMS_level=(\S+)",
         result.stdout,
@@ -48,6 +63,11 @@ def compute_audio_rms_series(
         except ValueError:
             continue
     log.info("audio RMS series: %d windows from %s", len(points), mp4.name)
+
+    if cache_path is not None:
+        cache_path.write_text(json.dumps(points), encoding="utf-8")
+        log.info("audio RMS series cached to %s", cache_path.name)
+
     return points
 
 

@@ -87,7 +87,7 @@ def _process_vod(
         before = len(transcript.segments)
         transcript.segments = [s for s in transcript.segments if s.start >= start_s]
         log.info(
-            "trimmed transcript: %d → %d segments (start_s=%.0f)",
+            "trimmed transcript: %d -> %d segments (start_s=%.0f)",
             before,
             len(transcript.segments),
             start_s,
@@ -103,7 +103,7 @@ def _process_vod(
         before = len(chat.messages)
         chat.messages = [m for m in chat.messages if m.time_in_seconds >= start_s]
         log.info(
-            "trimmed chat: %d → %d messages (start_s=%.0f)", before, len(chat.messages), start_s
+            "trimmed chat: %d -> %d messages (start_s=%.0f)", before, len(chat.messages), start_s
         )
     console.print(f"[green]chat loaded[/green]: {len(chat.messages)} messages")
 
