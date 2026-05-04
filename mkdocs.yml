@@ -1,0 +1,40 @@
+site_name: clipsmith
+site_description: Twitch VOD → AI-selected vertical clips
+site_url: https://ricardogr07.github.io/clipsmith
+repo_url: https://github.com/ricardogr07/clipsmith
+repo_name: ricardogr07/clipsmith
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: deep purple
+      accent: purple
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Commands: commands.md
+  - Configuration: configuration.md
+  - Architecture: architecture.md
+  - Examples: examples.md
+  - Developer:
+    - Dev Setup: dev/contributing.md
+    - Improvement Plan: dev/plan.md
