@@ -6,17 +6,33 @@ import json
 import logging
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Self
 
 import httpx
 
 log = logging.getLogger(__name__)
 
 # Emotes associated with hype/laughter moments (cross-language).
-HYPE_EMOTES = frozenset({
-    "KEKW", "OMEGALUL", "LUL", "PogChamp", "Pog", "PogO",
-    "LULW", "KEKLEO", "xD", "JAJAJA", "monkaS", "GIGACHAD",
-    "widepeepoHappy", "Pepega", "OMEGALUL", "EZ",
-})
+HYPE_EMOTES = frozenset(
+    {
+        "KEKW",
+        "OMEGALUL",
+        "LUL",
+        "PogChamp",
+        "Pog",
+        "PogO",
+        "LULW",
+        "KEKLEO",
+        "xD",
+        "JAJAJA",
+        "monkaS",
+        "GIGACHAD",
+        "widepeepoHappy",
+        "Pepega",
+        "OMEGALUL",
+        "EZ",
+    }
+)
 
 _GQL_URL = "https://gql.twitch.tv/gql"
 _CLIENT_ID = "kd1unb4b3q4t58fwlpcbzcbnm76a8fp"
@@ -29,8 +45,8 @@ class ChatMessage:
     time_in_seconds: float
     message: str
     author: str
-    is_clip_command: bool        # message starts with !clip
-    hype_emote_count: int        # number of HYPE_EMOTES found in message
+    is_clip_command: bool  # message starts with !clip
+    hype_emote_count: int  # number of HYPE_EMOTES found in message
 
 
 @dataclass
@@ -42,7 +58,7 @@ class ChatLog:
         return json.dumps(asdict(self), ensure_ascii=False, indent=2)
 
     @classmethod
-    def from_json(cls, text: str) -> "ChatLog":
+    def from_json(cls: type[Self], text: str) -> Self:
         d = json.loads(text)
         d["messages"] = [ChatMessage(**m) for m in d["messages"]]
         return cls(**d)
@@ -87,16 +103,18 @@ def _fetch_all_comments(video_id: str) -> list[ChatMessage]:
             else:
                 variables["contentOffsetSeconds"] = 0
 
-            payload = [{
-                "operationName": "VideoCommentsByOffsetOrCursor",
-                "variables": variables,
-                "extensions": {
-                    "persistedQuery": {
-                        "version": 1,
-                        "sha256Hash": _COMMENTS_HASH,
-                    }
-                },
-            }]
+            payload = [
+                {
+                    "operationName": "VideoCommentsByOffsetOrCursor",
+                    "variables": variables,
+                    "extensions": {
+                        "persistedQuery": {
+                            "version": 1,
+                            "sha256Hash": _COMMENTS_HASH,
+                        }
+                    },
+                }
+            ]
 
             resp = client.post(_GQL_URL, json=payload, headers={"Client-ID": _CLIENT_ID})
             resp.raise_for_status()

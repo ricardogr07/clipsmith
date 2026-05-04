@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
-from typing import Protocol, runtime_checkable
+from typing import Protocol, Self, runtime_checkable
 
 from ..candidates import CandidateMoment
 
@@ -26,7 +26,7 @@ class ClipPick:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> "ClipPick":
+    def from_dict(cls: type[Self], d: dict) -> Self:
         return cls(
             include=bool(d.get("include", False)),
             start_offset_s=float(d.get("start_offset_s", 0.0)),
@@ -36,14 +36,12 @@ class ClipPick:
         )
 
     @classmethod
-    def from_json(cls, text: str) -> "ClipPick":
+    def from_json(cls: type[Self], text: str) -> Self:
         # Strip markdown code fences if the LLM wrapped in ```json...```
         text = text.strip()
         if text.startswith("```"):
             lines = text.splitlines()
-            text = "\n".join(
-                line for line in lines if not line.startswith("```")
-            ).strip()
+            text = "\n".join(line for line in lines if not line.startswith("```")).strip()
         return cls.from_dict(json.loads(text))
 
 
