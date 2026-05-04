@@ -269,3 +269,44 @@ clipsmith/
             ├── clip_01_<title>.mp4
             └── ...
 ```
+
+---
+
+## Artifacts
+
+All generated media and intermediate files live outside version control.
+
+### `work/<VOD_ID>/` — scratch space (gitignored)
+
+| File | Produced by | Contents |
+|------|-------------|----------|
+| `<VOD_ID>.mp4` | `downloader.py` | Raw VOD download |
+| `webcam_rect.json` | `detect.py` | Auto-detected `[x, y, w, h]` in source pixels |
+| `transcript.json` | `transcribe.py` | Segments + word timestamps |
+| `chat.json` | `chat.py` | Raw chat messages with timestamps |
+| `candidates.json` | `candidates.py` | Scored candidate moments |
+| `audio_rms.json` | `audio_signal.py` | Per-window RMS energy series |
+| `picks.json` | `selector.py` | LLM decisions (include/skip + clip bounds) |
+| `*.ass` | `captions.py` | ASS subtitle files for each clip |
+
+Each file is written once and re-used on subsequent runs unless `--overwrite` is passed.
+
+### `out/<VOD_ID>/` — final clips (gitignored)
+
+| File | Contents |
+|------|----------|
+| `clip_NN_<slug>.mp4` | 9:16 vertical clip, 15–30 s, libx264/aac |
+| `clip_NN_<slug>.ass` | Matching subtitle file (kept alongside mp4) |
+| `stacked/clip_NN_<slug>.mp4` | Two-panel stacked variant (webcam + gameplay) |
+
+### Regenerating outputs
+
+```bash
+clipsmith run <VOD_ID>        # re-runs full pipeline for a Twitch VOD
+clipsmith process <path.mp4>  # same pipeline from a local file
+clipsmith clip <VOD_ID>       # re-cuts clips only (picks.json must exist)
+```
+
+### Version control
+
+`.gitignore` excludes `out/`, `work/`, `*.mp4`, `*.m4a`, `*.ass`, and `*.srt`. No media or intermediate artifacts are tracked in git.
