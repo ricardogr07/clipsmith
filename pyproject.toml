@@ -44,6 +44,13 @@ vision = [
 ollama = [
     "ollama>=0.3",
 ]
+cloud = [
+    "azure-mgmt-containerinstance>=10",
+    "azure-storage-blob>=12",
+    "azure-identity>=1.16",
+    "google-api-python-client>=2",
+    "google-auth-oauthlib>=1",
+]
 
 [project.scripts]
 clipsmith = "clipsmith.cli:app"

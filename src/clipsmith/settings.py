@@ -16,6 +16,7 @@ class ClipConfig(BaseModel):
     max_seconds: int = 30
     preroll_s: int = 25
     postroll_s: int = 10
+    min_clip_gap_s: int = 120  # minimum seconds between candidates sent to LLM
 
 
 class CandidatesConfig(BaseModel):
@@ -62,6 +63,17 @@ class ReframeConfig(BaseModel):
     split_ratio: float = Field(default=0.4, ge=0.01, le=0.99)
 
 
+class CloudConfig(BaseModel):
+    resource_group: str = "clipsmith-rg"
+    location: str = "eastus"
+    storage_account: str = ""
+    blob_container: str = "clipsmith-runs"
+    aci_cpu: float = 4.0
+    aci_memory_gb: float = 16.0
+    docker_image: str = ""
+    gpu_sku: str = ""  # e.g. "V100" — empty means CPU-only
+
+
 class AppConfig(BaseModel):
     channels: list[str] = Field(default_factory=list)
     poll_interval_s: int = 120
@@ -73,6 +85,7 @@ class AppConfig(BaseModel):
     llm: LLMConfig = LLMConfig()
     caption: CaptionConfig = CaptionConfig()
     reframe: ReframeConfig = ReframeConfig()
+    cloud: CloudConfig = CloudConfig()
 
 
 def _env_file_paths() -> list[Path]:
@@ -94,6 +107,11 @@ class Secrets(BaseSettings):
     twitch_client_secret: str = ""
     openai_api_key: str = ""
     anthropic_api_key: str = ""
+    azure_subscription_id: str = ""
+    azure_storage_account: str = ""
+    azure_storage_key: str = ""
+    google_service_account_json: str = ""
+    google_drive_folder_id: str = ""
 
 
 def load_config(path: str | Path = "config.yaml") -> AppConfig:

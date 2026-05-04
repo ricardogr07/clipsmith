@@ -24,7 +24,7 @@ candidates:
   # Boost per `!clip` chat message in the window
   clip_command_boost: 25.0
   # Dedupe candidates within this window (seconds)
-  dedupe_window_s: 30
+  dedupe_window_s: 60
   # Score per hype keyword hit found in transcript (jaja, wow, etc.)
   transcript_hype_score: 20.0
   # Audio RMS energy spikes — fires when the streamer clearly raises their voice
@@ -59,6 +59,16 @@ caption:
   font_size: 72   # ASS pts at 1080×1920 PlayRes — adjust to taste
   outline: 3
   position: bottom
+
+# cloud:
+#   resource_group: clipsmith-rg
+#   location: eastus
+#   storage_account: ""          # your Azure storage account name
+#   blob_container: clipsmith-runs
+#   aci_cpu: 4.0
+#   aci_memory_gb: 16.0
+#   docker_image: ""             # e.g. yourdockerhubuser/clipsmith:latest
+#   gpu_sku: ""                  # V100 | P100 | K80 — leave empty for CPU-only
 
 reframe:
   # center | webcam | stacked | face (future) | none
