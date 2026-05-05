@@ -1,0 +1,38 @@
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.coverage
+dist
+build
+site
+*.egg-info
+
+# Runtime artifacts — mounted as volumes, not baked in
+work/
+out/
+state.json
+*.mp4
+*.m4a
+*.ass
+*.srt
+
+# Secrets and local config — injected at runtime via env vars
+.env
+.env.example
+
+# Dev-only
+tests/
+docs/
+examples/
+scripts/
+mkdocs.yml
+AzureCLI.msi
+clipsmith.spec
+main.py

@@ -67,7 +67,7 @@ caption:
 #   blob_container: clipsmith-runs
 #   aci_cpu: 4.0
 #   aci_memory_gb: 16.0
-#   docker_image: ""             # e.g. yourdockerhubuser/clipsmith:latest
+#   docker_image: "ricardogr007/clipsmith:latest"
 #   gpu_sku: ""                  # V100 | P100 | K80 — leave empty for CPU-only
 
 reframe:
