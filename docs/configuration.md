@@ -9,10 +9,26 @@ clipsmith uses two config files: `.env` for secrets and `config.yaml` for behavi
 Copy `.env.example` to `.env` and fill in your keys:
 
 ```env
+# Twitch app credentials (https://dev.twitch.tv/console)
 TWITCH_CLIENT_ID=...
 TWITCH_CLIENT_SECRET=...
-ANTHROPIC_API_KEY=...       # if using provider: anthropic
-OPENAI_API_KEY=...          # if using provider: openai
+
+# LLM providers (only set the one(s) you'll use)
+ANTHROPIC_API_KEY=...
+OPENAI_API_KEY=...
+
+# Azure credentials (cloud mode only)
+AZURE_SUBSCRIPTION_ID=...
+AZURE_STORAGE_ACCOUNT=...
+AZURE_STORAGE_KEY=...
+
+# Docker Hub credentials (cloud mode — prevents ACI rate-limit errors)
+DOCKER_HUB_USERNAME=...
+DOCKER_HUB_PASSWORD=...     # use a read-only access token, not your password
+
+# Google Drive (cloud mode — run `clipsmith cloud drive-auth` once after setting this)
+GOOGLE_OAUTH_CLIENT_JSON=C:\git\clipsmith\google_oauth_client.json
+GOOGLE_DRIVE_FOLDER_ID=...
 ```
 
 Get Twitch credentials at <https://dev.twitch.tv/console> → Register Your Application →
@@ -149,3 +165,30 @@ candidates:
 ```yaml
 poll_interval_s: 120   # seconds between Twitch polls in watch mode
 ```
+
+---
+
+### `cloud`
+
+```yaml
+cloud:
+  resource_group: clipsmith-rg
+  location: eastus
+  storage_account: <your-storage-account>
+  aci_cpu: 4.0
+  aci_memory_gb: 16.0
+  docker_image: "<yourdockerhubuser>/clipsmith:latest"
+  gpu_sku: ""          # V100 | P100 | K80 — empty means CPU-only
+```
+
+| Key | Description |
+|-----|-------------|
+| `resource_group` | Azure resource group containing ACI and storage |
+| `location` | Azure region (e.g. `eastus`, `westus2`) |
+| `storage_account` | Storage account name (must match `AZURE_STORAGE_ACCOUNT` in `.env`) |
+| `aci_cpu` | vCPU count for the container (4.0 handles a 2-hr VOD in ~60 min) |
+| `aci_memory_gb` | RAM for the container in GB |
+| `docker_image` | Full Docker Hub image tag (built by `clipsmith cloud build`) |
+| `gpu_sku` | Optional NVIDIA GPU model — requires quota increase from Azure |
+
+The `cloud` section is only used by `clipsmith cloud` commands. Local `run-vod` and `process` commands ignore it.

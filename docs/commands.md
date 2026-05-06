@@ -149,3 +149,79 @@ Sanity check: resolve a Twitch login to a user ID via the Helix API.
 ```sh
 clipsmith whoami <login>
 ```
+
+---
+
+## `clipsmith cloud` — Azure cloud commands
+
+Provision an Azure Container Instance, run the pipeline in Docker, upload clips to Google Drive, and tear everything down.
+
+### `clipsmith cloud setup`
+
+Verify that the Azure storage account and file shares are reachable.
+
+```sh
+clipsmith cloud setup [--config config.yaml]
+```
+
+Checks that `clipsmith-work` and `clipsmith-out` file shares exist and that credentials in `.env` are valid. Run this once after initial Azure provisioning.
+
+---
+
+### `clipsmith cloud build`
+
+Build the Docker image locally and push it to Docker Hub.
+
+```sh
+clipsmith cloud build [--config config.yaml] [--no-push]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--push / --no-push` | Push to Docker Hub after build (default: push) |
+
+The image tag is read from `cloud.docker_image` in `config.yaml`.
+
+---
+
+### `clipsmith cloud run`
+
+Full end-to-end cloud run: provision ACI → pipeline → Google Drive upload → teardown.
+
+```sh
+clipsmith cloud run <vod_id> --game <game_name> [options]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--game`, `-g` | Game name (used as Drive subfolder) — **required** |
+| `--date`, `-d` | Stream date as `YYYY-MM-DD` (default: today) |
+| `--config`, `-c` | Path to `config.yaml` (default: `config.yaml`) |
+| `--dry-run` | Print ACI spec without provisioning anything |
+| `--verbose`, `-v` | Stream container logs to the terminal while polling |
+
+Clips are uploaded to Google Drive under `<root_folder>/<game>/<date>/` and the local temp copy is deleted on success.
+
+---
+
+### `clipsmith cloud drive-auth`
+
+One-time OAuth2 authorization for Google Drive. Opens a browser, asks you to log in with your Google account, and saves a refresh token to `~/.clipsmith_drive_token.json`.
+
+```sh
+clipsmith cloud drive-auth
+```
+
+Requires `GOOGLE_OAUTH_CLIENT_JSON` to be set in `.env`. Only needs to be run once; the token auto-refreshes on subsequent `cloud run` calls.
+
+---
+
+### `clipsmith cloud status`
+
+List all active clipsmith ACI jobs in the configured resource group.
+
+```sh
+clipsmith cloud status [--config config.yaml]
+```
+
+Shows container group name, current state, location, and Docker image for each running job.

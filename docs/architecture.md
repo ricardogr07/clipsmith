@@ -1,18 +1,48 @@
-# Clipsmith Architecture
+# Architecture
 
 ## Overview
 
-Clipsmith turns a Twitch VOD (or any local MP4) into a set of 9:16 vertical clips ready for TikTok / YouTube Shorts. The pipeline has three entry points:
+clipsmith turns a Twitch VOD (or any local MP4) into a set of 9:16 vertical clips ready for TikTok / YouTube Shorts. There are two execution modes:
 
-- **`watch`** — daemon that polls Twitch for new archive VODs
-- **`run-vod`** — one-shot run for a specific Twitch video ID
-- **`process`** — one-shot run from a local MP4 file
+- **Local mode** — runs on your workstation; `watch`, `run-vod`, and `process` all feed the same six-stage pipeline
+- **Cloud mode** — `clipsmith cloud run` provisions an Azure Container Instance, runs the same pipeline inside Docker, downloads the results, and uploads them to Google Drive — then tears everything down so Azure charges only for active compute time
 
-All three feed the same six-stage pipeline. A separate **`reframe`** command is available as a manual post-processing step to produce stacked webcam+gameplay layouts for selected clips.
+---
+
+## System Overview
+
+```mermaid
+graph TD
+    subgraph Local["Local workstation"]
+        CLI["clipsmith cloud run\nor run-vod / process"]
+        CONFIG["config.yaml + .env"]
+    end
+
+    subgraph Azure
+        FS_WORK["File Share\nclipsmith-work"]
+        ACI["ACI Container\nclipsmith-{vod_id}\n4 vCPU · 16 GB RAM"]
+        FS_OUT["File Share\nclipsmith-out"]
+    end
+
+    GD["Google Drive\ngame / date / clip_NN.mp4"]
+
+    CONFIG -->|loaded by| CLI
+    CLI -->|local mode: runs pipeline directly| CLI
+    CLI -->|1 upload config.yaml| FS_WORK
+    CLI -->|2 create container| ACI
+    FS_WORK -->|mounted /app/work| ACI
+    ACI -->|mounted /app/out| FS_OUT
+    CLI -->|3 poll every 30s| ACI
+    CLI -->|4 download clips| FS_OUT
+    CLI -->|5 delete container| ACI
+    CLI -->|6 upload OAuth2| GD
+```
 
 ---
 
 ## Pipeline Stages
+
+Both local and cloud modes run this same pipeline:
 
 ```
 VOD (mp4)
@@ -25,6 +55,7 @@ VOD (mp4)
     ▼
 [2] Transcribe ──────────────── faster-whisper (Spanish, CPU int8)
     │ transcript.json            segments + word timestamps
+    │                            chunked + parallel for long VODs
     │
     ▼
 [3] Chat Download ──────────── chat-downloader (Twitch replay API)
@@ -32,12 +63,13 @@ VOD (mp4)
     │                            fallback: evenly-spaced transcript samples
     │
     ▼
-[4] Candidate Scoring ────────  three signals merged & deduped
+[4] Candidate Scoring ────────  five signals merged & deduped
     │ candidates.json
     │   Signal A: existing Twitch clips  (+100 pts/clip)
     │   Signal B: !clip chat commands    (+25 pts each)
     │   Signal C: chat density peaks     (sliding window, 4× baseline)
     │   Signal D: transcript hype words  (+20 pts/hit)
+    │   Signal E: audio RMS peaks        (+15 pts, 2× baseline)
     │
     ▼
 [5] LLM Selection ────────────  one API call per candidate (top-20)
@@ -47,7 +79,7 @@ VOD (mp4)
     ▼
 [6] Clip Cutting ─────────────  ffmpeg per pick
     out/<vod_id>/               9:16 reframe → optional burned ASS captions
-    clip_01_<title>.mp4         libx264 fast / aac 128k / faststart
+    clip_01_<title>.mp4         stream-copy (none) or libx264/aac (all other modes)
 
     [manual: clipsmith reframe]
     ▼
@@ -58,173 +90,115 @@ VOD (mp4)
 
 ---
 
+## Cloud Execution Flow
+
+When you run `clipsmith cloud run <vod_id>`, the full lifecycle is:
+
+```mermaid
+sequenceDiagram
+    participant L as Local CLI
+    participant FS as Azure File Share
+    participant A as ACI Container
+    participant GD as Google Drive
+
+    L->>FS: upload config.yaml → clipsmith-work/
+    L->>A: create container group<br/>(image, env-var secrets, volume mounts)
+    Note over A: Pull Docker Hub image<br/>(authenticated — avoids 100/6h rate limit)
+    loop Poll every 30s
+        L->>A: GET container_groups/{vod_id}
+        A-->>L: Pending → Running → Succeeded
+    end
+    Note over A: clipsmith run-vod {vod_id}<br/>transcribe → score → LLM → ffmpeg<br/>~50–65 min for a 2-hr VOD
+    A->>FS: write out/{vod_id}/*.mp4 to clipsmith-out/
+    L->>FS: download clips from clipsmith-out/{vod_id}/
+    L->>A: delete container group (billing stops immediately)
+    L->>FS: delete work/{vod_id}/ and out/{vod_id}/
+    L->>GD: upload clips via OAuth2 user credentials
+    GD-->>L: webViewLink to date subfolder
+```
+
+---
+
 ## Module Map
 
 ```
 src/clipsmith/
 │
-├── cli.py            CLI entry point (Typer)
-│     commands:  process | watch | run-vod | clip | reframe | detect-webcam | whoami
+├── cli.py              CLI entry point (Typer); registers commands from sub-modules
+│     commands: process | watch | run-vod | clip | reframe | detect-webcam | whoami | cloud
 │
-├── pipeline.py       Orchestrator — calls stages 1-6 in order
-│                     holds transcript-fallback logic when chat is empty
+├── cli_run.py          Handlers: process, watch, run-vod, whoami
+├── cli_clip.py         Handlers: clip, reframe
+├── cli_setup.py        Handlers: setup, check-ollama, detect-webcam
+├── cli_cloud.py        Handlers: cloud setup | build | run | status | drive-auth
+├── cli_utils.py        Shared: config path resolution, timestamp parsing
 │
-├── watcher.py        Daemon: polls Helix every poll_interval_s seconds
-│                     emits VodEvent for each unseen archive VOD
+├── pipeline.py         Orchestrator — calls stages 1–6 in order
+│                       transcript-fallback logic when chat is empty
 │
-├── twitch_client.py  Helix API wrapper (httpx): get_user_id, get_videos, get_clips_for_vod
+├── watcher.py          Daemon: polls Helix every poll_interval_s; emits VodEvent
+├── twitch_client.py    Helix API wrapper (httpx): get_user_id, get_videos, get_clips_for_vod
+├── state.py            Persists seen VOD IDs to state.json between watcher runs
+├── downloader.py       Subprocess wrapper around twitch-dl download
 │
-├── state.py          Persists seen video IDs to state.json between runs
+├── detect.py           Webcam/face detection (OpenCV Haar cascade, optional [vision])
+│                       cache-first: writes webcam_rect.json, skips on subsequent runs
 │
-├── downloader.py     Subprocess wrapper around `python -m twitchdl download`
+├── transcribe.py       faster-whisper wrapper → Transcript (segments, words, language)
+│                       chunked parallel transcription via ThreadPoolExecutor
 │
-├── detect.py         Webcam/face detection (OpenCV Haar cascade, optional)
-│                     load_or_detect_webcam_rect: cache-first, updates cfg.reframe in-place
+├── audio_signal.py     ffmpeg astats filter → per-window RMS energy; peak detection
 │
-├── transcribe.py     faster-whisper wrapper → Transcript(segments, words, language)
+├── chat.py             chat-downloader wrapper → ChatLog (messages, !clip tags, hype emotes)
+│                       fallback: evenly-spaced transcript samples when chat unavailable
 │
-├── chat.py           `python -m chat_downloader` wrapper → ChatLog(messages)
-│                     parses JSON array or NDJSON; tags !clip commands and hype emotes
+├── candidates.py       Merges 5 signals → list[CandidateMoment] sorted by score
+├── candidates_math.py  Sliding-window density computation; peak detection math
 │
-├── candidates.py     Merges signals → list[CandidateMoment] sorted by score desc
-├── candidates_math.py  Sliding-window density + peak detection
-│
-├── selector.py       Loops candidates → LLM → PickResult; clamps clip duration 15-30s
+├── selector.py         Loops candidates → LLM call → PickResult; clamps duration 15–30s
 │
 ├── llm/
-│   ├── base.py       ClipPicker Protocol, ClipPick dataclass, SYSTEM_PROMPT, JSON schema
-│   ├── anthropic_provider.py   Prompt-cached: system + stream context cached, per-candidate varies
-│   ├── openai_provider.py      Structured outputs (json_schema); system cached after first call
-│   └── ollama_provider.py      Local Ollama stub
+│   ├── base.py                  ClipPicker protocol, ClipPick dataclass, SYSTEM_PROMPT
+│   ├── anthropic_provider.py    Prompt-cached: system + stream context cached per VOD
+│   ├── openai_provider.py       Structured outputs (json_schema); system cached
+│   └── ollama_provider.py       Local Ollama (free, no API cost)
 │
-├── clipper.py        cut_all_clips: writes ASS file, runs ffmpeg per pick
-│                     modes: center | webcam | stacked | none
-│                     stacked: _stacked_filter_complex builds filter_complex chain
-├── captions.py       Transcript → ASS subtitle file (burn-in, Spanish)
+├── clipper.py          ffmpeg per pick: trim, reframe, optional ASS captions
+│                       modes: center | webcam | stacked | none
+├── captions.py         Transcript → ASS subtitle file (karaoke-style Spanish)
 │
-└── settings.py       AppConfig (YAML) + Secrets (.env / env vars)
-                      ReframeConfig: mode, webcam_rect, gameplay_rect, split_ratio
+├── settings.py         AppConfig (YAML) + Secrets (.env / env vars)
+│                       CloudConfig, ClipConfig, TranscribeConfig, LLMConfig, ...
+├── state.py            JSON persistence for seen VOD IDs
+│
+└── cloud/
+    ├── azure_runner.py     ACI lifecycle: provision, poll, download, teardown
+    │                       Azure File Share: upload config, download clips, cleanup
+    └── drive_upload.py     Google Drive OAuth2: folder hierarchy creation, clip upload
 ```
-
----
-
-## Data Flow Diagram
-
-```mermaid
-flowchart TD
-    subgraph Inputs
-        VOD[VOD mp4\nwork/VIDEO_ID/VIDEO_ID.mp4]
-        CFG[config.yaml\nAppConfig]
-        ENV[.env\nSecrets]
-    end
-
-    subgraph CLI
-        PROCESS[process\nlocal mp4]
-        WATCH[watch\ndaemon]
-        RUNVOD[run-vod\none-shot]
-        CLIP[clip\nre-cut only]
-        REFRAME[reframe\nstacked layout]
-        DETECTWC[detect-webcam\nstandalone]
-    end
-
-    subgraph Twitch["Twitch API (optional)"]
-        HELIX[Helix REST\nget_videos / get_clips]
-        TWITCHDL[twitch-dl\ndownload]
-    end
-
-    subgraph Pipeline
-        DET[Detector\ndetect.py\nopencv optional]
-        DL[Downloader\ndownloader.py]
-        TR[Transcriber\ntranscribe.py\nfaster-whisper]
-        CH[Chat\nchat.py\nchat-downloader]
-        CA[Candidates\ncandidates.py\n+ candidates_math.py]
-        SEL[Selector\nselector.py]
-        CUT[Clipper\nclipper.py + captions.py\nffmpeg]
-        STK[Stacked Reframe\nclipper.py\nffmpeg filter_complex]
-    end
-
-    subgraph LLM["LLM Provider (llm/)"]
-        ANT[Anthropic\nclaude-sonnet-4-6]
-        OAI[OpenAI\ngpt-4.1]
-        OLL[Ollama\nllama3.1]
-    end
-
-    subgraph Artifacts["work/VIDEO_ID/"]
-        WR_JSON[webcam_rect.json]
-        T_JSON[transcript.json]
-        C_JSON[chat.json]
-        CA_JSON[candidates.json]
-        P_JSON[picks.json]
-    end
-
-    subgraph Output["out/VIDEO_ID/"]
-        MP4S[clip_NN_title.mp4\n9:16 · 15-30s]
-        STACKED[stacked/clip_NN_title.mp4\nwebcam top + gameplay bottom]
-    end
-
-    CFG --> WATCH & RUNVOD & PROCESS
-    ENV --> WATCH & RUNVOD & PROCESS
-
-    WATCH -->|new VOD event| Pipeline
-    RUNVOD --> Pipeline
-    PROCESS --> Pipeline
-    CLIP -->|picks.json exists| CUT
-    REFRAME -->|picks.json exists| STK
-    DETECTWC -->|standalone| DET
-
-    HELIX -->|existing clips| CA
-    TWITCHDL --> DL
-    DL --> VOD
-
-    VOD --> DET
-    DET --> WR_JSON
-
-    VOD --> TR
-    TR --> T_JSON
-    T_JSON --> CA & SEL & CUT
-
-    CH --> C_JSON
-    C_JSON --> CA
-    CA --> CA_JSON
-    CA_JSON --> SEL
-
-    SEL --> ANT & OAI & OLL
-    ANT & OAI & OLL --> P_JSON
-    P_JSON --> CUT & STK
-
-    VOD --> CUT & STK
-    WR_JSON -.->|auto-loaded| STK
-    CUT --> MP4S
-    STK --> STACKED
-```
-
----
-
-## Reframe Modes
-
-| Mode | Description |
-|------|-------------|
-| `none` | Stream-copy (no re-encode, no crop) |
-| `center` | Center-crop to 9:16 |
-| `webcam` | Crop to `webcam_rect`, scale to 1080×1920 |
-| `stacked` | Two-panel: `webcam_rect` on top, `gameplay_rect` on bottom; heights set by `split_ratio` |
-
-The `reframe` command always uses `stacked` mode regardless of the config value. The flat pipeline uses whatever `reframe.mode` is configured.
-
-### Webcam auto-detection
-
-`detect.py` samples `N` evenly-spaced frames (default 20, skipping the first/last 5% of duration), runs an OpenCV Haar frontal-face cascade on each, and clusters detections by IOU ≥ 0.3. The most-frequent cluster is returned as `[x, y, w, h]` in source-video pixels. The result is written to `work/<video_id>/webcam_rect.json` and loaded automatically on subsequent runs.
 
 ---
 
 ## Candidate Scoring Detail
 
+```mermaid
+flowchart LR
+    A["Existing Twitch clip\nat this VOD offset"]-->|+100 pts| S
+    B["!clip chat command\nin the window"]-->|+25 pts each| S
+    C["Chat density peak\n>4× baseline in 15s"]-->|proportional| S
+    D["Transcript hype keyword\njaja / wow / increíble…"]-->|+20 pts/hit| S
+    E["Audio RMS peak\n>2× baseline in 2s"]-->|+15 pts| S
+    S["Combined score"]-->F["Dedupe\n60s merge window"]
+    F-->G["Top 20\n→ LLM"]
+```
+
 | Signal | Source | Score |
 |--------|--------|-------|
-| Existing Twitch clip at this VOD offset | Helix API | +100 pts |
+| Existing Twitch clip at VOD offset | Helix API | +100 pts |
 | `!clip` chat command in window | Chat replay | +25 pts each |
-| Chat density peak (>4× baseline in 15 s window) | Chat replay | proportional |
+| Chat density peak (>4× baseline, 15 s window) | Chat replay | proportional |
 | Transcript hype keyword (jaja, wow, etc.) | Transcript | +20 pts/hit |
+| Audio RMS energy peak (>2× baseline, 2 s window) | ffmpeg astats | +15 pts |
 | Evenly-spaced sample (fallback, no chat data) | Transcript | 1 pt (uniform) |
 
 Candidates within 60 s of each other are merged (highest-score center kept, scores summed). Top 20 by score are sent to the LLM.
@@ -235,13 +209,41 @@ Candidates within 60 s of each other are merged (highest-score center kept, scor
 
 Each provider sends **two stable blocks + one variable block** to maximise prompt caching:
 
-1. **System prompt** (stable) — role, rules, JSON schema (~300 tokens, cached after first call)
-2. **Stream context** (stable per VOD) — channel, title, duration, language (~50 tokens, cached)
-3. **Candidate prompt** (varies) — transcript ±60 s window + viewer signals (~200–400 tokens)
+```mermaid
+flowchart TD
+    subgraph "Cached — sent once per VOD session"
+        SYS["System prompt\nRole, rules, JSON schema\n~300 tokens"]
+        CTX["Stream context\nChannel, title, duration, language\n~50 tokens"]
+    end
+    subgraph "Variable — one per candidate"
+        WIN["Transcript ±60s window\n~200–400 tokens"]
+        SIG["Viewer signals\nchat count, score breakdown"]
+    end
+    SYS --> LLM["LLM API call"]
+    CTX --> LLM
+    WIN --> LLM
+    SIG --> LLM
+    LLM --> OUT["ClipPick\ninclude · start_s · end_s\ntitle_es · reason"]
+```
 
-The LLM returns a single JSON object: `{ include, start_offset_s, end_offset_s, title_es, reason }`.
+`start_s` and `end_s` are **absolute timestamps** from the start of the VOD (not relative offsets).
 
-`start_offset_s` and `end_offset_s` are **absolute timestamps** from the start of the VOD (not offsets from `t_center`).
+---
+
+## Reframe Modes
+
+| Mode | Description |
+|------|-------------|
+| `none` | Stream-copy (no re-encode, no crop) |
+| `center` | Center-crop to 9:16, scale to 1080×1920 |
+| `webcam` | Crop to `webcam_rect`, scale to 1080×1920 |
+| `stacked` | Two-panel: `webcam_rect` on top, `gameplay_rect` on bottom; heights set by `split_ratio` |
+
+The `reframe` command always uses `stacked` mode. The main pipeline uses whatever `reframe.mode` is configured.
+
+### Webcam auto-detection
+
+`detect.py` samples N evenly-spaced frames (default 20, skipping the first/last 5% of duration), runs an OpenCV Haar frontal-face cascade on each, and clusters detections by IOU ≥ 0.3. The most-frequent cluster is returned as `[x, y, w, h]` in source-video pixels. The result is written to `work/<video_id>/webcam_rect.json` and loaded automatically on subsequent runs.
 
 ---
 
@@ -249,14 +251,16 @@ The LLM returns a single JSON object: `{ include, start_offset_s, end_offset_s, 
 
 ```
 clipsmith/
-├── config.yaml          behavior (channels, model sizes, thresholds)
-├── .env                 secrets (API keys, Twitch credentials)
+├── config.yaml          behaviour (channels, model sizes, thresholds)
+├── .env                 secrets (API keys, Twitch, Azure, Google Drive)
 ├── state.json           seen VOD IDs (auto-created by watcher)
+├── google_oauth_client.json   Google OAuth2 Desktop app credentials (gitignored)
 ├── work/
 │   └── <video_id>/
 │       ├── <video_id>.mp4
 │       ├── webcam_rect.json    (auto-detected, cached)
 │       ├── transcript.json
+│       ├── audio_rms.json
 │       ├── chat.json
 │       ├── candidates.json
 │       └── picks.json
@@ -283,9 +287,9 @@ All generated media and intermediate files live outside version control.
 | `<VOD_ID>.mp4` | `downloader.py` | Raw VOD download |
 | `webcam_rect.json` | `detect.py` | Auto-detected `[x, y, w, h]` in source pixels |
 | `transcript.json` | `transcribe.py` | Segments + word timestamps |
+| `audio_rms.json` | `audio_signal.py` | Per-window RMS energy series |
 | `chat.json` | `chat.py` | Raw chat messages with timestamps |
 | `candidates.json` | `candidates.py` | Scored candidate moments |
-| `audio_rms.json` | `audio_signal.py` | Per-window RMS energy series |
 | `picks.json` | `selector.py` | LLM decisions (include/skip + clip bounds) |
 | `*.ass` | `captions.py` | ASS subtitle files for each clip |
 
@@ -295,18 +299,16 @@ Each file is written once and re-used on subsequent runs unless `--overwrite` is
 
 | File | Contents |
 |------|----------|
-| `clip_NN_<slug>.mp4` | 9:16 vertical clip, 15–30 s, libx264/aac |
-| `clip_NN_<slug>.ass` | Matching subtitle file (kept alongside mp4) |
-| `stacked/clip_NN_<slug>.mp4` | Two-panel stacked variant (webcam + gameplay) |
+| `clip_NN_<slug>.mp4` | 9:16 vertical clip, 15–30 s |
+| `clip_NN_<slug>.ass` | Matching subtitle file |
+| `stacked/clip_NN_<slug>.mp4` | Two-panel stacked variant |
 
 ### Regenerating outputs
 
 ```bash
-clipsmith run <VOD_ID>        # re-runs full pipeline for a Twitch VOD
+clipsmith run-vod <VOD_ID>    # full pipeline for a Twitch VOD
 clipsmith process <path.mp4>  # same pipeline from a local file
-clipsmith clip <VOD_ID>       # re-cuts clips only (picks.json must exist)
+clipsmith clip <VOD_ID>       # re-cuts only (picks.json must exist)
 ```
 
-### Version control
-
-`.gitignore` excludes `out/`, `work/`, `*.mp4`, `*.m4a`, `*.ass`, and `*.srt`. No media or intermediate artifacts are tracked in git.
+`.gitignore` excludes `out/`, `work/`, `*.mp4`, `*.m4a`, `*.ass`, and `*.srt`. No media or artifacts are tracked in git.
