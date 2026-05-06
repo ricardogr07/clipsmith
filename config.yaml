@@ -60,15 +60,14 @@ caption:
   outline: 3
   position: bottom
 
-# cloud:
-#   resource_group: clipsmith-rg
-#   location: eastus
-#   storage_account: ""          # your Azure storage account name
-#   blob_container: clipsmith-runs
-#   aci_cpu: 4.0
-#   aci_memory_gb: 16.0
-#   docker_image: "ricardogr007/clipsmith:latest"
-#   gpu_sku: ""                  # V100 | P100 | K80 — leave empty for CPU-only
+cloud:
+  resource_group: clipsmith-rg
+  location: eastus
+  storage_account: clipsmithstoragerg07
+  aci_cpu: 4.0
+  aci_memory_gb: 16.0
+  docker_image: "ricardogr007/clipsmith:latest"
+  gpu_sku: ""                  # V100 | P100 | K80 - leave empty for CPU-only
 
 reframe:
   # center | webcam | stacked | face (future) | none

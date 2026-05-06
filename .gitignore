@@ -1,4 +1,8 @@
 .env
+*-sa.json
+google_oauth_client.json
+~/.clipsmith_drive_token.json
+.pytest-tmp/
 .claude/
 .venv/
 venv/
