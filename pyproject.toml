@@ -46,7 +46,7 @@ ollama = [
 ]
 cloud = [
     "azure-mgmt-containerinstance>=10",
-    "azure-storage-blob>=12",
+    "azure-storage-file-share>=12",
     "azure-identity>=1.16",
     "google-api-python-client>=2",
     "google-auth-oauthlib>=1",
@@ -74,3 +74,4 @@ disallow_untyped_defs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"

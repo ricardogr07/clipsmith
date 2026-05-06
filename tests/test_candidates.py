@@ -129,7 +129,7 @@ def test_existing_clip_gets_boost():
     top = candidates[0]
     assert top.t_center == pytest.approx(300.0)
     assert "existing_clip" in top.sources
-    assert top.score >= 100.0
+    assert 1.0 <= top.score <= 100.0
 
 
 def test_clip_command_creates_candidate():

@@ -110,7 +110,10 @@ class Secrets(BaseSettings):
     azure_subscription_id: str = ""
     azure_storage_account: str = ""
     azure_storage_key: str = ""
+    docker_hub_username: str = ""
+    docker_hub_password: str = ""
     google_service_account_json: str = ""
+    google_oauth_client_json: str = ""
     google_drive_folder_id: str = ""
 
 
