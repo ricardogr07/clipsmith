@@ -31,7 +31,7 @@ def compute_audio_rms_series(
         log.info(
             "audio RMS series: loaded %d windows from cache (%s)", len(points), cache_path.name
         )
-        return points
+        return _dedupe_windows(points, window_s)
 
     sample_rate = 16000
     reset_samples = int(window_s * sample_rate)
@@ -62,6 +62,8 @@ def compute_audio_rms_series(
                 points.append((t, db))
         except ValueError:
             continue
+    points = _dedupe_windows(points, window_s)
+
     log.info("audio RMS series: %d windows from %s", len(points), mp4.name)
 
     if cache_path is not None:
@@ -69,6 +71,23 @@ def compute_audio_rms_series(
         log.info("audio RMS series cached to %s", cache_path.name)
 
     return points
+
+
+def _dedupe_windows(
+    points: list[tuple[float, float]], window_s: float
+) -> list[tuple[float, float]]:
+    """Collapse per-frame entries to one sample per analysis window.
+
+    ffmpeg ametadata outputs one line per audio frame inside each reset window,
+    so raw parsed data has ~10-20 near-identical entries per window_s interval.
+    Keep the last frame per bucket (most accumulated stats).
+    """
+    if not points:
+        return points
+    bucketed: dict[int, tuple[float, float]] = {}
+    for t, db in points:
+        bucketed[int((t - window_s / 2) / window_s)] = (t, db)
+    return sorted(bucketed.values())
 
 
 def find_rms_peaks(

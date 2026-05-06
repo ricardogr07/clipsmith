@@ -31,6 +31,25 @@ class PickResult:
         }
 
 
+def _spread_candidates(
+    candidates: list[CandidateMoment],
+    min_gap_s: float,
+    max_n: int,
+) -> list[CandidateMoment]:
+    """Greedy time-spread: pick highest-score candidates at least min_gap_s apart.
+
+    Iterates candidates in descending score order. A candidate is included only
+    if it is at least min_gap_s seconds from every already-selected candidate.
+    """
+    selected: list[CandidateMoment] = []
+    for c in candidates:
+        if all(abs(c.t_center - s.t_center) >= min_gap_s for s in selected):
+            selected.append(c)
+            if len(selected) >= max_n:
+                break
+    return selected
+
+
 def select_clips(
     candidates: list[CandidateMoment],
     transcript: Transcript,
@@ -44,7 +63,11 @@ def select_clips(
 
     Only passes the top max_candidates by score to avoid excessive API calls.
     """
-    top = sorted(candidates, key=lambda c: c.score, reverse=True)[:max_candidates]
+    top = _spread_candidates(
+        sorted(candidates, key=lambda c: c.score, reverse=True),
+        min_gap_s=config.min_clip_gap_s,
+        max_n=max_candidates,
+    )
     picks: list[PickResult] = []
 
     for i, candidate in enumerate(top, 1):

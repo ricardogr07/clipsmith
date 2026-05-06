@@ -152,6 +152,7 @@ def build_candidates(
 
     # --- Merge: deduplicate within dedupe_window_s, keeping max score ---
     merged = _dedupe(raw, window_s=config.dedupe_window_s)
+    merged = _normalize_scores(merged)
 
     return sorted(merged, key=lambda c: c.score, reverse=True)
 
@@ -183,7 +184,7 @@ def _dedupe(
         best = max(group, key=lambda x: x[1])
         total_score = sum(x[1] for x in group)
         sources = list(dict.fromkeys(x[2] for x in group))  # unique, ordered
-        reasons = [x[3] for x in group]
+        reasons = list(dict.fromkeys(x[3] for x in group))  # unique, ordered
         candidates.append(
             CandidateMoment(
                 t_center=best[0],
@@ -192,6 +193,23 @@ def _dedupe(
                 reasons=reasons,
             )
         )
+    return candidates
+
+
+def _normalize_scores(candidates: list[CandidateMoment]) -> list[CandidateMoment]:
+    """Map raw scores to [1, 100] preserving rank order."""
+    if len(candidates) < 2:
+        for c in candidates:
+            c.score = 50.0
+        return candidates
+    lo = min(c.score for c in candidates)
+    hi = max(c.score for c in candidates)
+    if hi == lo:
+        for c in candidates:
+            c.score = 50.0
+        return candidates
+    for c in candidates:
+        c.score = round(1.0 + 99.0 * (c.score - lo) / (hi - lo), 1)
     return candidates
 
 
