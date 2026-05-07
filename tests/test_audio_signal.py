@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from clipsmith.audio_signal import compute_audio_rms_series, find_rms_peaks
+from clipsmith.candidates.audio import compute_audio_rms_series, find_rms_peaks
 
 
 def _fake_ametadata(*entries: tuple[float, float]) -> str:
@@ -25,7 +25,7 @@ def test_rms_series_parses_ffmpeg_output(tmp_path: Path) -> None:
     mock_result = MagicMock()
     mock_result.stdout = fake_output
 
-    with patch("clipsmith.audio_signal.subprocess.run", return_value=mock_result):
+    with patch("clipsmith.candidates.audio.subprocess.run", return_value=mock_result):
         series = compute_audio_rms_series(mp4, window_s=2.0)
 
     assert len(series) == 3
@@ -44,7 +44,7 @@ def test_rms_series_skips_silence(tmp_path: Path) -> None:
     mock_result = MagicMock()
     mock_result.stdout = fake_output
 
-    with patch("clipsmith.audio_signal.subprocess.run", return_value=mock_result):
+    with patch("clipsmith.candidates.audio.subprocess.run", return_value=mock_result):
         series = compute_audio_rms_series(mp4, window_s=2.0)
 
     # Only the -20.0 dB window survives; the two silence windows are filtered

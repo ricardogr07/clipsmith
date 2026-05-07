@@ -13,9 +13,9 @@ from .utils import _parse_start_at, _resolve_config
 from ..models.twitch import Video
 from ..pipeline import process_vod, _setup_logging
 from ..settings import load_config, load_secrets
-from ..state import State
-from ..twitch_client import TwitchClient
-from ..watcher import watch as watch_iter
+from ..twitch.state import State
+from ..twitch.client import TwitchClient
+from ..twitch.watcher import watch as watch_iter
 
 console = Console()
 log = logging.getLogger(__name__)

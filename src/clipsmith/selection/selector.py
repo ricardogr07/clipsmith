@@ -5,10 +5,10 @@ from __future__ import annotations
 import logging
 from dataclasses import asdict, dataclass
 
-from .llm.base import ClipPick, ClipPicker
-from .models.candidates import CandidateMoment
-from .models.transcript import Transcript
-from .settings import ClipConfig
+from ..llm.base import ClipPick, ClipPicker
+from ..models.candidates import CandidateMoment
+from ..models.transcript import Transcript
+from ..settings import ClipConfig
 
 log = logging.getLogger(__name__)
 

@@ -121,60 +121,72 @@ sequenceDiagram
 
 ## Module Map
 
+Each top-level package owns one functional domain. No cross-domain flat imports — every dependency crosses package boundaries explicitly.
+
 ```
 src/clipsmith/
 │
-├── cli.py              CLI entry point (Typer); registers commands from sub-modules
-│     commands: process | watch | run-vod | clip | reframe | detect-webcam | whoami | cloud
+├── cli/                        CLI layer (Typer)
+│   ├── __init__.py             App wiring; registers all commands
+│   ├── run.py                  Handlers: process, watch, run-vod, whoami
+│   ├── clip.py                 Handlers: clip, reframe
+│   ├── setup.py                Handlers: setup, check-ollama, detect-webcam
+│   ├── cloud.py                Handlers: cloud setup | build | run | status | drive-auth
+│   └── utils.py                Config path resolution, timestamp parsing
 │
-├── cli_run.py          Handlers: process, watch, run-vod, whoami
-├── cli_clip.py         Handlers: clip, reframe
-├── cli_setup.py        Handlers: setup, check-ollama, detect-webcam
-├── cli_cloud.py        Handlers: cloud setup | build | run | status | drive-auth
-├── cli_utils.py        Shared: config path resolution, timestamp parsing
+├── pipeline.py                 Orchestrator — wires stages 1–6 in order
+│                               transcript-fallback logic when chat is empty
 │
-├── pipeline.py         Orchestrator — calls stages 1–6 in order
-│                       transcript-fallback logic when chat is empty
+├── twitch/                     Twitch integration
+│   ├── client.py               Helix API wrapper (httpx): get_user_id, get_videos, get_clips
+│   ├── downloader.py           Subprocess wrapper around twitch-dl download
+│   ├── chat.py                 GQL chat replay → ChatLog (messages, !clip tags, hype emotes)
+│   ├── watcher.py              Daemon: polls Helix every poll_interval_s; emits VodEvent
+│   └── state.py                Persists seen VOD IDs to state.json between watcher runs
 │
-├── watcher.py          Daemon: polls Helix every poll_interval_s; emits VodEvent
-├── twitch_client.py    Helix API wrapper (httpx): get_user_id, get_videos, get_clips_for_vod
-├── state.py            Persists seen VOD IDs to state.json between watcher runs
-├── downloader.py       Subprocess wrapper around twitch-dl download
+├── transcription/              Whisper transcription
+│   └── transcriber.py          faster-whisper → Transcript (segments, words, language)
+│                               chunked parallel transcription via ThreadPoolExecutor
 │
-├── detect.py           Webcam/face detection (OpenCV Haar cascade, optional [vision])
-│                       cache-first: writes webcam_rect.json, skips on subsequent runs
+├── candidates/                 Candidate detection signals
+│   ├── builder.py              Merges 5 signals → list[CandidateMoment] sorted by score
+│   ├── math.py                 Sliding-window chat density; peak detection math
+│   └── audio.py                ffmpeg astats filter → per-window RMS energy; peak detection
 │
-├── transcribe.py       faster-whisper wrapper → Transcript (segments, words, language)
-│                       chunked parallel transcription via ThreadPoolExecutor
+├── selection/                  LLM-based clip selection
+│   └── selector.py             Loops candidates → LLM call → PickResult; clamps duration
 │
-├── audio_signal.py     ffmpeg astats filter → per-window RMS energy; peak detection
+├── rendering/                  FFmpeg output layer
+│   ├── clipper.py              Trim, reframe, optional ASS captions (modes: center/webcam/stacked/none)
+│   ├── captions.py             Transcript → ASS subtitle file (karaoke-style Spanish)
+│   └── detect.py               Webcam/face detection (OpenCV Haar cascade, optional [vision])
+│                               cache-first: writes webcam_rect.json, skips on subsequent runs
 │
-├── chat.py             chat-downloader wrapper → ChatLog (messages, !clip tags, hype emotes)
-│                       fallback: evenly-spaced transcript samples when chat unavailable
+├── llm/                        LLM provider abstraction
+│   ├── base.py                 ClipPicker Protocol, ClipPick dataclass
+│   ├── prompts.py              SYSTEM_PROMPT, build_candidate_prompt, build_stream_context
+│   ├── anthropic_provider.py   Prompt-cached: system + stream context cached per VOD
+│   ├── openai_provider.py      Structured outputs (json_schema); system cached
+│   └── ollama_provider.py      Local Ollama (free, no API cost)
 │
-├── candidates.py       Merges 5 signals → list[CandidateMoment] sorted by score
-├── candidates_math.py  Sliding-window density computation; peak detection math
+├── models/                     Pure dataclasses — zero I/O
+│   ├── transcript.py           Word, Segment, Transcript
+│   ├── candidates.py           CandidateMoment
+│   ├── chat.py                 ChatMessage, ChatLog, HYPE_EMOTES
+│   └── twitch.py               Video, Clip
 │
-├── selector.py         Loops candidates → LLM call → PickResult; clamps duration 15–30s
+├── config/                     Configuration layer
+│   ├── models.py               Pydantic schema models (AppConfig, ClipConfig, …)
+│   └── loaders.py              Secrets (pydantic-settings), load_config, load_secrets
 │
-├── llm/
-│   ├── base.py                  ClipPicker protocol, ClipPick dataclass, SYSTEM_PROMPT
-│   ├── anthropic_provider.py    Prompt-cached: system + stream context cached per VOD
-│   ├── openai_provider.py       Structured outputs (json_schema); system cached
-│   └── ollama_provider.py       Local Ollama (free, no API cost)
+├── io/
+│   └── media.py                video_duration() via ffprobe — single source of truth
 │
-├── clipper.py          ffmpeg per pick: trim, reframe, optional ASS captions
-│                       modes: center | webcam | stacked | none
-├── captions.py         Transcript → ASS subtitle file (karaoke-style Spanish)
+├── cloud/                      Azure + Google Drive
+│   ├── azure_runner.py         ACI lifecycle: provision, poll, download, teardown
+│   └── drive_upload.py         Google Drive OAuth2: folder creation, clip upload
 │
-├── settings.py         AppConfig (YAML) + Secrets (.env / env vars)
-│                       CloudConfig, ClipConfig, TranscribeConfig, LLMConfig, ...
-├── state.py            JSON persistence for seen VOD IDs
-│
-└── cloud/
-    ├── azure_runner.py     ACI lifecycle: provision, poll, download, teardown
-    │                       Azure File Share: upload config, download clips, cleanup
-    └── drive_upload.py     Google Drive OAuth2: folder hierarchy creation, clip upload
+└── settings.py                 Re-export shim — backward compat for existing importers
 ```
 
 ---
@@ -243,7 +255,7 @@ The `reframe` command always uses `stacked` mode. The main pipeline uses whateve
 
 ### Webcam auto-detection
 
-`detect.py` samples N evenly-spaced frames (default 20, skipping the first/last 5% of duration), runs an OpenCV Haar frontal-face cascade on each, and clusters detections by IOU ≥ 0.3. The most-frequent cluster is returned as `[x, y, w, h]` in source-video pixels. The result is written to `work/<video_id>/webcam_rect.json` and loaded automatically on subsequent runs.
+`rendering/detect.py` samples N evenly-spaced frames (default 20, skipping the first/last 5% of duration), runs an OpenCV Haar frontal-face cascade on each, and clusters detections by IOU ≥ 0.3. The most-frequent cluster is returned as `[x, y, w, h]` in source-video pixels. The result is written to `work/<video_id>/webcam_rect.json` and loaded automatically on subsequent runs.
 
 ---
 
@@ -284,14 +296,14 @@ All generated media and intermediate files live outside version control.
 
 | File | Produced by | Contents |
 |------|-------------|----------|
-| `<VOD_ID>.mp4` | `downloader.py` | Raw VOD download |
-| `webcam_rect.json` | `detect.py` | Auto-detected `[x, y, w, h]` in source pixels |
-| `transcript.json` | `transcribe.py` | Segments + word timestamps |
-| `audio_rms.json` | `audio_signal.py` | Per-window RMS energy series |
-| `chat.json` | `chat.py` | Raw chat messages with timestamps |
-| `candidates.json` | `candidates.py` | Scored candidate moments |
-| `picks.json` | `selector.py` | LLM decisions (include/skip + clip bounds) |
-| `*.ass` | `captions.py` | ASS subtitle files for each clip |
+| `<VOD_ID>.mp4` | `twitch/downloader.py` | Raw VOD download |
+| `webcam_rect.json` | `rendering/detect.py` | Auto-detected `[x, y, w, h]` in source pixels |
+| `transcript.json` | `transcription/transcriber.py` | Segments + word timestamps |
+| `audio_rms.json` | `candidates/audio.py` | Per-window RMS energy series |
+| `chat.json` | `twitch/chat.py` | Raw chat messages with timestamps |
+| `candidates.json` | `candidates/builder.py` | Scored candidate moments |
+| `picks.json` | `selection/selector.py` | LLM decisions (include/skip + clip bounds) |
+| `*.ass` | `rendering/captions.py` | ASS subtitle files for each clip |
 
 Each file is written once and re-used on subsequent runs unless `--overwrite` is passed.
 

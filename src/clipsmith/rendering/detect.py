@@ -9,20 +9,17 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .io.media import video_duration
+from ..io.media import video_duration
 
 if TYPE_CHECKING:
-    from .settings import ReframeConfig
+    from ..settings import ReframeConfig
 
 log = logging.getLogger(__name__)
 
 _WEBCAM_RECT_CACHE = "webcam_rect.json"
 
-# How many evenly-spaced frames to sample across the video
 _SAMPLE_COUNT = 20
-# Minimum fraction of samples a face position must appear in to be trusted
 _MIN_HIT_RATE = 0.3
-# IOU threshold for merging rectangles into the same cluster
 _IOU_MERGE = 0.3
 
 
@@ -60,10 +57,7 @@ def _iou(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> float:
 def _cluster_rects(
     rects: list[tuple[int, int, int, int]],
 ) -> list[tuple[tuple[int, int, int, int], int]]:
-    """
-    Group overlapping rects by IOU. Returns list of (representative_rect, count)
-    sorted by count descending.
-    """
+    """Group overlapping rects by IOU. Returns list of (representative_rect, count) sorted by count descending."""
     clusters: list[list[tuple[int, int, int, int]]] = []
     for r in rects:
         merged = False
@@ -101,8 +95,7 @@ def detect_webcam_rect(
     min_face_frac: float = 0.03,
     max_face_frac: float = 0.35,
 ) -> list[int] | None:
-    """
-    Sample frames from *mp4*, detect faces via Haar cascade, cluster results,
+    """Sample frames from *mp4*, detect faces via Haar cascade, cluster results,
     and return the most-consistent [x, y, w, h] rect in source-video pixels.
 
     Returns None if no stable face is found.
@@ -124,7 +117,6 @@ def detect_webcam_rect(
     if duration <= 0:
         raise RuntimeError(f"Could not determine duration of {mp4}")
 
-    # Sample evenly, avoiding first/last 5% (often black frames)
     margin = duration * 0.05
     step = (duration - 2 * margin) / (sample_count - 1)
     timestamps = [margin + i * step for i in range(sample_count)]
@@ -146,8 +138,6 @@ def detect_webcam_rect(
             h_frame, w_frame = frame.shape[:2]
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-            # Size constraints: face must be between min_face_frac and max_face_frac
-            # of the frame's shorter dimension
             short_side = min(w_frame, h_frame)
             min_px = int(short_side * min_face_frac)
             max_px = int(short_side * max_face_frac)
@@ -207,16 +197,12 @@ def detect_webcam_rect(
 
 
 def load_or_detect_webcam_rect(mp4: Path, vod_dir: Path, reframe: "ReframeConfig") -> None:
-    """
-    Populate reframe.webcam_rect if not already set.
+    """Populate reframe.webcam_rect if not already set.
 
     Order of precedence:
       1. Already set in config — do nothing.
       2. Cache file work/<video_id>/webcam_rect.json exists — load it.
       3. Run detection, cache result, update reframe in-place.
-
-    No-op (with a debug log) when reframe.mode is 'none', or when opencv
-    is not installed and there is no cache.
     """
     if reframe.mode == "none":
         return

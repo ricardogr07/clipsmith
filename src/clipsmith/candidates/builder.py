@@ -13,14 +13,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .candidates_math import compute_density_scores
-from .models.candidates import CandidateMoment
-from .models.chat import ChatLog
-from .models.transcript import Transcript
-from .models.twitch import Clip
-from .settings import CandidatesConfig
+from .math import compute_density_scores
+from ..models.candidates import CandidateMoment
+from ..models.chat import ChatLog
+from ..models.transcript import Transcript
+from ..models.twitch import Clip
+from ..settings import CandidatesConfig
 
-# Re-export so existing imports from this module keep working.
 __all__ = ["CandidateMoment", "build_candidates", "save_candidates", "load_candidates"]
 
 # Spanish/stream hype keywords that suggest a funny or exciting moment.
@@ -127,7 +126,7 @@ def build_candidates(
 
     # --- Signal 5: audio RMS energy spikes (raised voice) ---
     if config.audio_energy_enabled and mp4_path is not None:
-        from .audio_signal import compute_audio_rms_series, find_rms_peaks
+        from .audio import compute_audio_rms_series, find_rms_peaks
 
         series = compute_audio_rms_series(
             mp4_path, config.audio_energy_window_s, cache_dir=mp4_path.parent
@@ -157,7 +156,6 @@ def _dedupe(
     if not raw:
         return []
 
-    # Sort by time so we can sweep once.
     events = sorted(raw, key=lambda x: x[0])
     groups: list[list[tuple[float, float, str, str]]] = []
     current: list[tuple[float, float, str, str]] = [events[0]]
@@ -172,11 +170,10 @@ def _dedupe(
 
     candidates: list[CandidateMoment] = []
     for group in groups:
-        # Center on the highest-score event in the group.
         best = max(group, key=lambda x: x[1])
         total_score = sum(x[1] for x in group)
-        sources = list(dict.fromkeys(x[2] for x in group))  # unique, ordered
-        reasons = list(dict.fromkeys(x[3] for x in group))  # unique, ordered
+        sources = list(dict.fromkeys(x[2] for x in group))
+        reasons = list(dict.fromkeys(x[3] for x in group))
         candidates.append(
             CandidateMoment(
                 t_center=best[0],

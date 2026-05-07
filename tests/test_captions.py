@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from conftest import _seg, _transcript, _word
-from clipsmith.captions import (
+from clipsmith.rendering.captions import (
     _ass_time,
     _caption_lines,
     _render_ass,
@@ -14,12 +14,18 @@ from clipsmith.settings import CaptionConfig
 
 
 def _cfg(**kw: object) -> CaptionConfig:
-    defaults: dict[str, object] = {"font": "Arial", "font_size": 72, "outline": 3, "position": "bottom"}
+    defaults: dict[str, object] = {
+        "font": "Arial",
+        "font_size": 72,
+        "outline": 3,
+        "position": "bottom",
+    }
     defaults.update(kw)
     return CaptionConfig(**defaults)  # type: ignore[arg-type]
 
 
 # ── _ass_time ─────────────────────────────────────────────────────────────────
+
 
 def test_ass_time_zero() -> None:
     assert _ass_time(0.0) == "0:00:00.00"
@@ -46,6 +52,7 @@ def test_ass_time_clamps_negative() -> None:
 
 
 # ── _caption_lines ────────────────────────────────────────────────────────────
+
 
 def test_caption_lines_uses_word_timestamps() -> None:
     words = [
@@ -106,6 +113,7 @@ def test_caption_lines_groups_long_word_runs() -> None:
 
 
 # ── _render_ass ───────────────────────────────────────────────────────────────
+
 
 def test_render_ass_has_sections() -> None:
     ass = _render_ass([], _cfg())

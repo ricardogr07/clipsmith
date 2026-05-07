@@ -7,10 +7,10 @@ import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 
-from .models.twitch import Video
-from .settings import AppConfig, Secrets
+from ..models.twitch import Video
+from ..settings import AppConfig, Secrets
+from .client import TwitchClient
 from .state import State
-from .twitch_client import TwitchClient
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +34,6 @@ def watch(
     """
     state = state or State()
     with TwitchClient(secrets.twitch_client_id, secrets.twitch_client_secret) as tc:
-        # Resolve logins -> user ids once.
         user_ids: dict[str, str] = {}
         for login in config.channels:
             try:

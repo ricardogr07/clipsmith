@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 
-from clipsmith.downloader import download_vod, DownloadResult
+from clipsmith.twitch.downloader import download_vod, DownloadResult
 
 
 def test_skip_download_if_file_exists(tmp_path):

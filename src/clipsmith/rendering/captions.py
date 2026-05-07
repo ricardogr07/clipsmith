@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .models.transcript import Transcript, Word
-from .settings import CaptionConfig
+from ..models.transcript import Transcript, Word
+from ..settings import CaptionConfig
 
 _WORDS_PER_LINE = 5
 _MAX_LINE_CHARS = 28

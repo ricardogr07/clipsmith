@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .models.chat import ChatMessage
+from ..models.chat import ChatMessage
 
 
 def compute_density_scores(

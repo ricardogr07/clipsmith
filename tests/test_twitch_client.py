@@ -7,8 +7,8 @@ import time
 import httpx
 import pytest
 
-from clipsmith import twitch_client as tc_mod
-from clipsmith.twitch_client import TwitchClient
+from clipsmith.twitch import client as tc_mod
+from clipsmith.twitch.client import TwitchClient
 
 
 class _FakeResp:

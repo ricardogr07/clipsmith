@@ -9,14 +9,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
-from .io.media import video_duration
-from .models.transcript import Segment, Transcript, Word
-from .settings import TranscribeConfig
+from ..io.media import video_duration
+from ..models.transcript import Segment, Transcript, Word
+from ..settings import TranscribeConfig
 
 log = logging.getLogger(__name__)
 
-# Re-export models so existing imports from this module keep working
-# during the transition; downstream code should prefer models.transcript.
 __all__ = ["Word", "Segment", "Transcript", "transcribe"]
 
 

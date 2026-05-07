@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from clipsmith.transcribe import Segment, Transcript, Word, _merge_segments, _extract_audio_chunk
+from clipsmith.models.transcript import Segment, Transcript, Word
+from clipsmith.transcription.transcriber import _extract_audio_chunk, _merge_segments
 
 
 def _make_transcript(video_id: str = "v1") -> Transcript:
@@ -71,7 +72,7 @@ def test_from_json_empty_words():
 
 def test_transcribe_loads_from_cache(tmp_path):
     """transcribe() should return cached transcript.json without importing faster-whisper."""
-    from clipsmith.transcribe import transcribe
+    from clipsmith.transcription.transcriber import transcribe
     from clipsmith.settings import TranscribeConfig
 
     t = _make_transcript("cached")
@@ -145,7 +146,7 @@ def test_extract_audio_chunk_calls_ffmpeg(tmp_path):
     mp4 = tmp_path / "video.mp4"
     mp4.touch()
     out_wav = tmp_path / "chunk.wav"
-    with patch("clipsmith.transcribe.subprocess.check_call") as mock_cc:
+    with patch("clipsmith.transcription.transcriber.subprocess.check_call") as mock_cc:
         _extract_audio_chunk(mp4, start_s=60.0, duration_s=1830.0, out_wav=out_wav)
     args = mock_cc.call_args[0][0]
     assert "ffmpeg" in args[0]

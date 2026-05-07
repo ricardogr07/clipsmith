@@ -6,10 +6,10 @@ from conftest import _seg, _transcript
 
 import pytest
 
-from clipsmith.candidates import CandidateMoment
+from clipsmith.models.candidates import CandidateMoment
 from clipsmith.llm.base import ClipPick
 from clipsmith.llm.prompts import build_stream_context
-from clipsmith.selector import (
+from clipsmith.selection.selector import (
     _extract_transcript_window,
     select_clips,
 )

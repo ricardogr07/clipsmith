@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from clipsmith.candidates import CandidateMoment
+from clipsmith.models.candidates import CandidateMoment
 from clipsmith.llm.ollama_provider import OllamaProvider
 
 

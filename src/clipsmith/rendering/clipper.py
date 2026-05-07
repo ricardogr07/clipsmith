@@ -11,9 +11,9 @@ import unicodedata
 from pathlib import Path
 
 from .captions import _write_ass
-from .models.transcript import Transcript
-from .selector import PickResult
-from .settings import AppConfig, ReframeConfig
+from ..models.transcript import Transcript
+from ..selection.selector import PickResult
+from ..settings import AppConfig, ReframeConfig
 
 log = logging.getLogger(__name__)
 
@@ -130,7 +130,6 @@ def _video_filter(reframe: ReframeConfig, ass_path: Path | None) -> str:
         parts.append("crop=ih*9/16:ih,scale=1080:1920:flags=lanczos")
 
     if ass_path is not None:
-        # ffmpeg filter paths: forward slashes, drive colon escaped
         ass_str = str(ass_path).replace("\\", "/").replace(":", "\\:")
         parts.append(f"subtitles='{ass_str}'")
 
@@ -187,7 +186,6 @@ def _stacked_encode_args(reframe: ReframeConfig, ass_path: Path | None) -> list[
 
 def _title_slug(title: str) -> str:
     """Filesystem-safe ASCII slug from a Spanish clip title."""
-    # Decompose accented chars (é → e + combining accent), then drop combiners
     normalized = unicodedata.normalize("NFKD", title)
     ascii_only = "".join(c for c in normalized if not unicodedata.combining(c))
     slug = ascii_only.lower()

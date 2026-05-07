@@ -1,4 +1,4 @@
-from clipsmith.state import State
+from clipsmith.twitch.state import State
 
 
 def test_state_persists_across_instances(tmp_path):

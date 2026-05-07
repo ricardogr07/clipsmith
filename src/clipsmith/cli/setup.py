@@ -14,8 +14,8 @@ import typer
 from rich.console import Console
 
 from .utils import _resolve_config
-from ..clipper import _find_ffmpeg
-from ..detect import detect_webcam_rect
+from ..rendering.clipper import _find_ffmpeg
+from ..rendering.detect import detect_webcam_rect
 from ..pipeline import _setup_logging
 from ..settings import load_config
 

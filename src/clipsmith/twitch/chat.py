@@ -7,11 +7,10 @@ from pathlib import Path
 
 import httpx
 
-from .models.chat import HYPE_EMOTES, ChatLog, ChatMessage
+from ..models.chat import HYPE_EMOTES, ChatLog, ChatMessage
 
 log = logging.getLogger(__name__)
 
-# Re-export models so existing imports from this module keep working.
 __all__ = ["ChatMessage", "ChatLog", "HYPE_EMOTES", "download_chat"]
 
 _GQL_URL = "https://gql.twitch.tv/gql"

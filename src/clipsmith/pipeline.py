@@ -10,19 +10,19 @@ from rich.logging import RichHandler
 import json
 from pathlib import Path
 
-from .candidates import build_candidates, save_candidates
-from .chat import download_chat
-from .clipper import cut_all_clips
-from .detect import load_or_detect_webcam_rect
-from .downloader import download_vod
+from .candidates.builder import build_candidates, save_candidates
+from .twitch.chat import download_chat
+from .rendering.clipper import cut_all_clips
+from .rendering.detect import load_or_detect_webcam_rect
+from .twitch.downloader import download_vod
 from .llm import get_provider
 from .llm.prompts import build_stream_context
 from .models.candidates import CandidateMoment
 from .models.twitch import Video
-from .selector import PickResult, select_clips
+from .selection.selector import PickResult, select_clips
 from .settings import AppConfig, Secrets
-from .transcribe import transcribe
-from .twitch_client import TwitchClient
+from .transcription.transcriber import transcribe
+from .twitch.client import TwitchClient
 
 console = Console()
 log = logging.getLogger(__name__)

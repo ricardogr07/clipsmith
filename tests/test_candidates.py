@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from clipsmith.candidates import build_candidates, _dedupe
-from clipsmith.candidates_math import compute_density_scores
-from clipsmith.chat import ChatLog, ChatMessage
+from clipsmith.candidates.builder import build_candidates, _dedupe
+from clipsmith.candidates.math import compute_density_scores
+from clipsmith.models.chat import ChatLog, ChatMessage
 from clipsmith.settings import CandidatesConfig
-from clipsmith.twitch_client import Clip
+from clipsmith.models.twitch import Clip
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -167,7 +167,7 @@ def test_no_candidates_for_completely_empty_data():
 
 
 def _transcript(segments: list[tuple[float, float, str]]):
-    from clipsmith.transcribe import Segment, Transcript
+    from clipsmith.models.transcript import Segment, Transcript
 
     segs = [Segment(start=s, end=e, text=t, words=[]) for s, e, t in segments]
     return Transcript(video_id="v1", language="es", segments=segs)

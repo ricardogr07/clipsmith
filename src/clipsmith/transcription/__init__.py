@@ -1,0 +1,1 @@
+"""Transcription via faster-whisper."""

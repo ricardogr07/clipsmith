@@ -3,7 +3,7 @@
 from __future__ import annotations
 from pathlib import Path
 
-from clipsmith.clipper import (
+from clipsmith.rendering.clipper import (
     _build_ffmpeg_cmd,
     _stacked_filter_complex,
     _title_slug,
@@ -13,6 +13,7 @@ from clipsmith.settings import ReframeConfig
 
 
 # ── _title_slug ───────────────────────────────────────────────────────────────
+
 
 def test_slug_strips_accents() -> None:
     assert _title_slug("Reacción épica") == "reaccion_epica"
@@ -40,8 +41,10 @@ def test_slug_spaces_become_underscores() -> None:
 
 # ── _video_filter ─────────────────────────────────────────────────────────────
 
+
 def test_video_filter_center(tmp_path: object) -> None:
     from pathlib import Path
+
     ass = Path(str(tmp_path)) / "sub.ass"  # type: ignore[arg-type]
     vf = _video_filter(ReframeConfig(mode="center"), ass)
     assert "crop=ih*9/16:ih" in vf
@@ -51,6 +54,7 @@ def test_video_filter_center(tmp_path: object) -> None:
 
 def test_video_filter_webcam(tmp_path: object) -> None:
     from pathlib import Path
+
     ass = Path(str(tmp_path)) / "sub.ass"  # type: ignore[arg-type]
     reframe = ReframeConfig(mode="webcam", webcam_rect=[100, 200, 400, 711])
     vf = _video_filter(reframe, ass)
@@ -60,6 +64,7 @@ def test_video_filter_webcam(tmp_path: object) -> None:
 
 def test_video_filter_webcam_no_rect_falls_back_to_center(tmp_path: object) -> None:
     from pathlib import Path
+
     ass = Path(str(tmp_path)) / "sub.ass"  # type: ignore[arg-type]
     vf = _video_filter(ReframeConfig(mode="webcam", webcam_rect=None), ass)
     assert "crop=ih*9/16:ih" in vf
@@ -67,6 +72,7 @@ def test_video_filter_webcam_no_rect_falls_back_to_center(tmp_path: object) -> N
 
 def test_video_filter_escapes_windows_path(tmp_path: object) -> None:
     from pathlib import Path
+
     ass = Path(str(tmp_path)) / "sub.ass"  # type: ignore[arg-type]
     vf = _video_filter(ReframeConfig(mode="center"), ass)
     # No raw backslashes should appear in the filter string
@@ -92,6 +98,7 @@ def test_video_filter_none_mode_no_captions() -> None:
 
 
 # ── _build_ffmpeg_cmd ─────────────────────────────────────────────────────────
+
 
 def test_ffmpeg_cmd_stream_copy_when_no_reframe_no_captions(tmp_path: Path) -> None:
     mp4 = tmp_path / "v.mp4"
@@ -120,6 +127,7 @@ def test_ffmpeg_cmd_reencode_when_captions_enabled(tmp_path: Path) -> None:
 
 
 # ── _stacked_filter_complex ───────────────────────────────────────────────────
+
 
 def _stacked_cfg(**kw) -> ReframeConfig:
     return ReframeConfig(mode="stacked", **kw)
@@ -151,7 +159,7 @@ def test_stacked_filter_no_gameplay_rect_falls_back_to_center_bot() -> None:
 def test_stacked_filter_split_ratio_pixel_heights() -> None:
     cfg = _stacked_cfg(split_ratio=0.4)
     fc = _stacked_filter_complex(cfg, None)
-    assert "scale=1080:768" in fc   # int(1920 * 0.4) = 768
+    assert "scale=1080:768" in fc  # int(1920 * 0.4) = 768
     assert "scale=1080:1152" in fc  # 1920 - 768 = 1152
 
 

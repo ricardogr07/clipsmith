@@ -8,9 +8,8 @@ from typing import Any
 
 import httpx
 
-from .models.twitch import Clip, Video
+from ..models.twitch import Clip, Video
 
-# Re-export models so existing imports from this module keep working.
 __all__ = ["Video", "Clip", "TwitchClient"]
 
 HELIX = "https://api.twitch.tv/helix"
