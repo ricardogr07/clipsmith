@@ -1,3 +1,7 @@
+"""Tests for twitch.state — JSON persistence."""
+
+from __future__ import annotations
+
 from clipsmith.twitch.state import State
 
 

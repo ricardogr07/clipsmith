@@ -1,10 +1,10 @@
-"""Unit tests for cloud.azure_runner — all Azure SDK calls are mocked."""
+"""Integration tests for cloud.azure_runner — Azure SDK calls are mocked."""
 
 from __future__ import annotations
 
 import sys
-from types import ModuleType
 from pathlib import Path
+from types import ModuleType
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,7 +13,6 @@ from clipsmith.settings import AppConfig, CloudConfig, Secrets
 
 
 def _azure_sys_modules() -> dict:
-    """Fake azure module hierarchy so tests run without the [cloud] extra installed."""
     azure = ModuleType("azure")
     core = ModuleType("azure.core")
     core_creds = ModuleType("azure.core.credentials")
@@ -67,11 +66,6 @@ def _azure_sys_modules() -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture()
 def config() -> AppConfig:
     cfg = AppConfig()
@@ -88,7 +82,7 @@ def config() -> AppConfig:
 
 @pytest.fixture()
 def secrets() -> Secrets:
-    s = Secrets.model_construct(
+    return Secrets.model_construct(
         azure_subscription_id="sub-123",
         azure_storage_account="testaccount",
         azure_storage_key="key==",
@@ -99,12 +93,6 @@ def secrets() -> Secrets:
         google_service_account_json="",
         google_drive_folder_id="",
     )
-    return s
-
-
-# ---------------------------------------------------------------------------
-# upload_config
-# ---------------------------------------------------------------------------
 
 
 def test_upload_config(tmp_path: Path, secrets: Secrets) -> None:
@@ -124,15 +112,9 @@ def test_upload_config(tmp_path: Path, secrets: Secrets) -> None:
     mock_file_client.upload_file.assert_called_once_with(cfg_file.read_bytes())
 
 
-# ---------------------------------------------------------------------------
-# create_container_group — dry_run
-# ---------------------------------------------------------------------------
-
-
 def test_create_container_group_dry_run(config: AppConfig, secrets: Secrets) -> None:
     from clipsmith.cloud.azure_runner import create_container_group
 
-    # Should not call ACI at all in dry_run mode
     with patch("clipsmith.cloud.azure_runner._aci_client") as mock_aci:
         name = create_container_group("123456", config, secrets, dry_run=True)
 
@@ -145,8 +127,6 @@ def test_create_container_group_live(config: AppConfig, secrets: Secrets) -> Non
     mock_poller = MagicMock()
     mock_client.container_groups.begin_create_or_update.return_value = mock_poller
 
-    # The inline imports inside create_container_group look up sys.modules at call time,
-    # so patching sys.modules here is sufficient — no module reload needed.
     with (
         patch.dict(sys.modules, _azure_sys_modules()),
         patch("clipsmith.cloud.azure_runner._aci_client", return_value=mock_client),
@@ -161,11 +141,6 @@ def test_create_container_group_live(config: AppConfig, secrets: Secrets) -> Non
     assert call_args.args[0] == "clipsmith-rg"
     assert call_args.args[1] == "clipsmith-123456"
     mock_poller.result.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# poll_until_done
-# ---------------------------------------------------------------------------
 
 
 def test_poll_until_done_succeeds(config: AppConfig, secrets: Secrets) -> None:
@@ -188,7 +163,6 @@ def test_poll_until_done_succeeds(config: AppConfig, secrets: Secrets) -> None:
 
 def test_poll_until_done_polls_multiple_times(config: AppConfig, secrets: Secrets) -> None:
     mock_client = MagicMock()
-
     running = MagicMock()
     running.instance_view.state = "Running"
     done = MagicMock()
@@ -207,11 +181,6 @@ def test_poll_until_done_polls_multiple_times(config: AppConfig, secrets: Secret
     assert mock_client.container_groups.get.call_count == 3
 
 
-# ---------------------------------------------------------------------------
-# download_output
-# ---------------------------------------------------------------------------
-
-
 def test_download_output_returns_clip_paths(tmp_path: Path, secrets: Secrets) -> None:
     mock_item = {"name": "clip_01_test.mp4", "is_directory": False}
     mock_dir_client = MagicMock()
@@ -219,7 +188,6 @@ def test_download_output_returns_clip_paths(tmp_path: Path, secrets: Secrets) ->
     mock_dir_client.get_file_client.return_value.download_file.return_value.readall.return_value = (
         b"fake-video-data"
     )
-
     mock_share = MagicMock()
     mock_share.get_directory_client.return_value = mock_dir_client
 
@@ -236,11 +204,6 @@ def test_download_output_returns_clip_paths(tmp_path: Path, secrets: Secrets) ->
     assert clips[0].read_bytes() == b"fake-video-data"
 
 
-# ---------------------------------------------------------------------------
-# delete_container_group
-# ---------------------------------------------------------------------------
-
-
 def test_delete_container_group(config: AppConfig, secrets: Secrets) -> None:
     mock_client = MagicMock()
     mock_poller = MagicMock()
@@ -255,11 +218,6 @@ def test_delete_container_group(config: AppConfig, secrets: Secrets) -> None:
         "clipsmith-rg", "clipsmith-123456"
     )
     mock_poller.result.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# run_vod_on_aci — dry_run integration
-# ---------------------------------------------------------------------------
 
 
 def test_run_vod_on_aci_dry_run(tmp_path: Path, config: AppConfig, secrets: Secrets) -> None:

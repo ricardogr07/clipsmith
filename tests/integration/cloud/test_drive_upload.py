@@ -1,4 +1,4 @@
-"""Unit tests for cloud.drive_upload — Google SDK mocked via sys.modules."""
+"""Integration tests for cloud.drive_upload — Google SDK mocked via sys.modules."""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ import pytest
 
 from clipsmith.settings import Secrets
 
-# Sentinel: a path that never exists so tests always take the SA fallback in _drive_service.
 _NO_TOKEN = Path("/nonexistent/clipsmith_drive_token.json")
 
 
@@ -33,7 +32,6 @@ def _make_secrets(sa_path: str = "/fake/sa.json", folder_id: str = "root-folder"
 
 
 def _google_modules() -> dict:
-    """Fake google module hierarchy so tests run without [cloud] extra installed."""
     google = ModuleType("google")
     google_auth = ModuleType("google.auth")  # type: ignore[attr-defined]
     google_auth_transport = ModuleType("google.auth.transport")
@@ -78,9 +76,7 @@ def _google_modules() -> dict:
 
 
 def _make_service(game_folder_id="gf-1", date_folder_id="df-1", existing_folders=False):
-    """Return a mock Drive service wired for the folder-creation flow."""
     service = MagicMock()
-
     empty = {"files": []}
     found_game = {"files": [{"id": game_folder_id}]}
     found_date = {"files": [{"id": date_folder_id}]}
@@ -90,10 +86,10 @@ def _make_service(game_folder_id="gf-1", date_folder_id="df-1", existing_folders
     else:
         service.files().list().execute.side_effect = [empty, empty]
         service.files().create().execute.side_effect = [
-            {"id": game_folder_id},  # game folder creation
-            {"id": date_folder_id},  # date folder creation
-            {"id": "clip-file-id"},  # clip upload (repeated per clip)
-        ] + [{"id": f"clip-{i}"} for i in range(10)]  # extra slots for multiple clips
+            {"id": game_folder_id},
+            {"id": date_folder_id},
+            {"id": "clip-file-id"},
+        ] + [{"id": f"clip-{i}"} for i in range(10)]
 
     service.files().get().execute.return_value = {
         "webViewLink": "https://drive.google.com/drive/folders/df-1"
@@ -101,15 +97,9 @@ def _make_service(game_folder_id="gf-1", date_folder_id="df-1", existing_folders
     return service
 
 
-# ---------------------------------------------------------------------------
-# upload_clips — happy path
-# ---------------------------------------------------------------------------
-
-
 def test_upload_clips_creates_folder_hierarchy(tmp_path: Path) -> None:
     clip = tmp_path / "clip_01_test.mp4"
     clip.write_bytes(b"fake-video")
-
     fake_sa = tmp_path / "sa.json"
     fake_sa.write_text("{}")
     secrets = _make_secrets(sa_path=str(fake_sa))
@@ -127,11 +117,7 @@ def test_upload_clips_creates_folder_hierarchy(tmp_path: Path) -> None:
         link = upload_clips([clip], "FNAF2", "2026-04-26", secrets)
 
     assert link == "https://drive.google.com/drive/folders/df-1"
-
-    # Two list() calls: one for game folder, one for date folder
     assert mock_service.files().list().execute.call_count == 2
-
-    # Two create() calls for folders + one for the clip
     create_calls = mock_service.files().create.call_args_list
     body_args = [
         c.kwargs.get("body") or c.args[0] if c.args else c.kwargs["body"]
@@ -163,9 +149,7 @@ def test_upload_clips_reuses_existing_folders(tmp_path: Path) -> None:
 
         upload_clips([clip], "Hollow Knight: Silksong", "2026-04-26", secrets)
 
-    # Folders found — no folder create() calls, only clip upload
-    list_count = mock_service.files().list().execute.call_count
-    assert list_count == 2
+    assert mock_service.files().list().execute.call_count == 2
 
 
 def test_upload_clips_uploads_multiple_files(tmp_path: Path) -> None:
@@ -190,14 +174,8 @@ def test_upload_clips_uploads_multiple_files(tmp_path: Path) -> None:
 
         upload_clips(clips, "FNAF2", "2026-04-26", secrets)
 
-    # MediaFileUpload should be called once per clip
     http_mod = mods["googleapiclient.http"]
     assert http_mod.MediaFileUpload.call_count == 3
-
-
-# ---------------------------------------------------------------------------
-# Error paths
-# ---------------------------------------------------------------------------
 
 
 def test_upload_clips_missing_sa_file(tmp_path: Path) -> None:

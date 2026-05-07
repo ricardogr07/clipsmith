@@ -1,14 +1,13 @@
-"""Tests for selector.py — transcript windowing and clip selection logic."""
+"""Tests for selection.selector — transcript windowing and clip selection logic."""
 
 from __future__ import annotations
 
-from conftest import _seg, _transcript
-
 import pytest
 
-from clipsmith.models.candidates import CandidateMoment
+from helpers import _seg, _transcript
 from clipsmith.llm.base import ClipPick
 from clipsmith.llm.prompts import build_stream_context
+from clipsmith.models.candidates import CandidateMoment
 from clipsmith.selection.selector import (
     _extract_transcript_window,
     select_clips,
@@ -72,8 +71,6 @@ def test_extract_window_has_relative_timestamps() -> None:
 
 
 class _AcceptAll:
-    """Mock picker that accepts every candidate."""
-
     def __init__(self) -> None:
         self.calls: list[CandidateMoment] = []
 
@@ -91,8 +88,6 @@ class _AcceptAll:
 
 
 class _RejectAll:
-    """Mock picker that rejects every candidate."""
-
     def pick(
         self, transcript_window: str, candidate: CandidateMoment, stream_context: str
     ) -> ClipPick:
@@ -106,8 +101,6 @@ class _RejectAll:
 
 
 class _FailAll:
-    """Mock picker that always errors."""
-
     def pick(self, transcript_window: str, candidate: CandidateMoment, stream_context: str) -> None:
         return None
 
@@ -151,14 +144,12 @@ def test_select_clips_respects_max_candidates() -> None:
 
 
 def test_select_clips_clamped_duration() -> None:
-    """The picker returns a 60s clip; select_clips should clamp it to 30s."""
-
     class _LongPick:
         def pick(self, tw: str, c: CandidateMoment, sc: str) -> ClipPick:
             return ClipPick(
                 include=True,
                 start_offset_s=c.t_center - 5,
-                end_offset_s=c.t_center + 55,  # 60s — too long
+                end_offset_s=c.t_center + 55,
                 title_es="Largo",
                 reason="test",
             )

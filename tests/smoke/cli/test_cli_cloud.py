@@ -1,4 +1,4 @@
-"""Tests for the `clipsmith cloud` command group."""
+"""Smoke tests for the `clipsmith cloud` command group."""
 
 from __future__ import annotations
 
@@ -15,7 +15,6 @@ runner = CliRunner()
 
 
 def _azure_fileshare_mod(share_names: list[str]) -> dict:
-    """Fake azure.storage.fileshare with a stubbed ShareServiceClient."""
     azure = ModuleType("azure")
     core = ModuleType("azure.core")
     core_creds = ModuleType("azure.core.credentials")
@@ -40,11 +39,6 @@ def _azure_fileshare_mod(share_names: list[str]) -> dict:
         "azure.storage": storage,
         "azure.storage.fileshare": fileshare,
     }
-
-
-# ---------------------------------------------------------------------------
-# cloud setup
-# ---------------------------------------------------------------------------
 
 
 def test_cloud_setup_passes_with_both_shares(tmp_path: Path) -> None:
@@ -74,7 +68,7 @@ def test_cloud_setup_fails_missing_share(tmp_path: Path) -> None:
     cfg = tmp_path / "config.yaml"
     cfg.write_text("")
 
-    mods = _azure_fileshare_mod(["clipsmith-work"])  # clipsmith-out missing
+    mods = _azure_fileshare_mod(["clipsmith-work"])
     with patch.dict(sys.modules, mods):
         result = runner.invoke(
             app,
@@ -104,11 +98,6 @@ def test_cloud_setup_fails_missing_env(tmp_path: Path) -> None:
 
     assert result.exit_code != 0
     assert "not set" in result.output
-
-
-# ---------------------------------------------------------------------------
-# cloud run --dry-run
-# ---------------------------------------------------------------------------
 
 
 def test_cloud_run_dry_run(tmp_path: Path) -> None:
@@ -147,8 +136,6 @@ def test_cloud_run_uses_today_as_default_date(tmp_path: Path) -> None:
     cfg = tmp_path / "config.yaml"
     cfg.write_text("cloud:\n  docker_image: ricardogr007/clipsmith:latest\n")
 
-    # Mirror download_output structure: <tmpdir>/<vod_id>/clip_01.mp4
-    # so cloud_run's shutil.rmtree(clips[0].parent.parent) removes tmp_path, not its parent.
     vod_dir = tmp_path / "123456"
     vod_dir.mkdir()
     fake_clip = vod_dir / "clip_01.mp4"
@@ -185,7 +172,7 @@ def test_cloud_run_requires_docker_image() -> None:
 
     with tempfile.TemporaryDirectory() as d:
         cfg = Path(d) / "config.yaml"
-        cfg.write_text("")  # no docker_image
+        cfg.write_text("")
 
         result = runner.invoke(
             app,

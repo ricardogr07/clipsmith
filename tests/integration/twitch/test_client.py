@@ -1,4 +1,4 @@
-"""Smoke tests for TwitchClient using mocked httpx responses."""
+"""Integration tests for twitch.client — HTTP responses mocked via custom fake."""
 
 from __future__ import annotations
 
@@ -50,30 +50,23 @@ def _build(http: _FakeHttp) -> TwitchClient:
     return c
 
 
-def test_requires_credentials():
+def test_requires_credentials() -> None:
     with pytest.raises(ValueError):
         TwitchClient("", "")
 
 
-def test_token_fetched_and_cached():
+def test_token_fetched_and_cached() -> None:
     http = _FakeHttp()
-    http.stub(
-        tc_mod.OAUTH_TOKEN_URL,
-        _FakeResp({"access_token": "tok", "expires_in": 3600}),
-    )
-    http.stub(
-        f"{tc_mod.HELIX}/users",
-        _FakeResp({"data": [{"id": "42", "login": "x"}]}),
-    )
+    http.stub(tc_mod.OAUTH_TOKEN_URL, _FakeResp({"access_token": "tok", "expires_in": 3600}))
+    http.stub(f"{tc_mod.HELIX}/users", _FakeResp({"data": [{"id": "42", "login": "x"}]}))
     c = _build(http)
     assert c.get_user_id("x") == "42"
-    # Second call should reuse the cached token, not refetch.
     assert c.get_user_id("x") == "42"
     posts = [call for call in http.calls if call[0] == "POST"]
     assert len(posts) == 1
 
 
-def test_get_user_id_missing_raises():
+def test_get_user_id_missing_raises() -> None:
     http = _FakeHttp()
     http.stub(tc_mod.OAUTH_TOKEN_URL, _FakeResp({"access_token": "t", "expires_in": 60}))
     http.stub(f"{tc_mod.HELIX}/users", _FakeResp({"data": []}))
@@ -82,7 +75,7 @@ def test_get_user_id_missing_raises():
         c.get_user_id("nope")
 
 
-def test_get_videos_parses_archive():
+def test_get_videos_parses_archive() -> None:
     http = _FakeHttp()
     http.stub(tc_mod.OAUTH_TOKEN_URL, _FakeResp({"access_token": "t", "expires_in": 60}))
     http.stub(
@@ -113,7 +106,7 @@ def test_get_videos_parses_archive():
     assert vids[0].type == "archive"
 
 
-def test_get_clips_filters_by_video():
+def test_get_clips_filters_by_video() -> None:
     http = _FakeHttp()
     http.stub(tc_mod.OAUTH_TOKEN_URL, _FakeResp({"access_token": "t", "expires_in": 60}))
     http.stub(
@@ -154,16 +147,12 @@ def test_get_clips_filters_by_video():
     assert clips[0].vod_offset == 1234
 
 
-def test_token_refreshes_when_expired(monkeypatch):
+def test_token_refreshes_when_expired(monkeypatch) -> None:
     http = _FakeHttp()
-    http.stub(
-        tc_mod.OAUTH_TOKEN_URL,
-        _FakeResp({"access_token": "t1", "expires_in": 1}),
-    )
+    http.stub(tc_mod.OAUTH_TOKEN_URL, _FakeResp({"access_token": "t1", "expires_in": 1}))
     http.stub(f"{tc_mod.HELIX}/users", _FakeResp({"data": [{"id": "1"}]}))
     c = _build(http)
     c.get_user_id("a")
-    # Force expiry.
     monkeypatch.setattr(time, "time", lambda: c._token_expires_at + 1)
     c.get_user_id("a")
     posts = [call for call in http.calls if call[0] == "POST"]

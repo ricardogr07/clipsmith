@@ -1,10 +1,10 @@
-"""Tests for captions.py — ASS subtitle generation."""
+"""Tests for rendering.captions — ASS subtitle generation."""
 
 from __future__ import annotations
 
 import pytest
 
-from conftest import _seg, _transcript, _word
+from helpers import _seg, _transcript, _word
 from clipsmith.rendering.captions import (
     _ass_time,
     _caption_lines,
@@ -71,7 +71,6 @@ def test_caption_lines_relative_timestamps() -> None:
     words = [_word(305.0, 305.5, "Okay")]
     t = _transcript(_seg(305.0, 305.5, "Okay", words))
     lines = _caption_lines(t, 300.0, 310.0)
-    # rel_start should be ~5.0, not 305.0
     assert lines[0][0] == pytest.approx(5.0, abs=0.01)
 
 
@@ -105,7 +104,6 @@ def test_caption_lines_empty_transcript() -> None:
 
 
 def test_caption_lines_groups_long_word_runs() -> None:
-    # 12 words → should produce at least 2 lines (max 5 per line)
     words = [_word(300.0 + i * 0.5, 300.3 + i * 0.5, f"w{i}") for i in range(12)]
     t = _transcript(_seg(300.0, 306.0, " ".join(w.word for w in words), words))
     lines = _caption_lines(t, 300.0, 310.0)
@@ -129,7 +127,6 @@ def test_render_ass_uses_configured_font() -> None:
 
 def test_render_ass_bottom_alignment() -> None:
     ass = _render_ass([], _cfg(position="bottom"))
-    # Alignment 2 = bottom-center in ASS numpad layout
     assert ",2," in ass
 
 

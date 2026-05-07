@@ -75,3 +75,11 @@ disallow_untyped_defs = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+pythonpath = ["tests"]
+addopts = "--import-mode=importlib"
+markers = [
+    "unit: fast, no I/O, no subprocess calls",
+    "integration: mocked external services or subprocess",
+    "smoke: CLI runner or real config/YAML loading",
+    "e2e: full pipeline against real infrastructure; skipped unless --run-e2e",
+]

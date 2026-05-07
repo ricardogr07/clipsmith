@@ -1,14 +1,14 @@
-"""Tests for candidates.py and candidates_math.py."""
+"""Tests for candidates.builder and candidates.math."""
 
 from __future__ import annotations
 
 import pytest
 
-from clipsmith.candidates.builder import build_candidates, _dedupe
+from clipsmith.candidates.builder import _dedupe, build_candidates
 from clipsmith.candidates.math import compute_density_scores
 from clipsmith.models.chat import ChatLog, ChatMessage
-from clipsmith.settings import CandidatesConfig
 from clipsmith.models.twitch import Clip
+from clipsmith.settings import CandidatesConfig
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -46,11 +46,17 @@ def _cfg(**overrides) -> CandidatesConfig:
     return CandidatesConfig(**overrides)
 
 
+def _transcript(segments: list[tuple[float, float, str]]):
+    from clipsmith.models.transcript import Segment, Transcript
+
+    segs = [Segment(start=s, end=e, text=t, words=[]) for s, e, t in segments]
+    return Transcript(video_id="v1", language="es", segments=segs)
+
+
 # ── density math ──────────────────────────────────────────────────────────────
 
 
 def test_density_detects_spike():
-    # 50 quiet messages spread across 500s, then a burst of 40 in 15s window.
     quiet = [_msg(float(i * 10)) for i in range(50)]
     burst_center = 300.0
     burst = [_msg(burst_center + i * 0.3) for i in range(40)]
@@ -59,7 +65,6 @@ def test_density_detects_spike():
     scores = compute_density_scores(msgs, window_s=15, peak_multiplier=4.0, step_s=5.0)
     assert scores, "expected at least one density peak"
     peak_times = [t for t, _ in scores]
-    # Peak should land near 300s
     assert any(290 <= t <= 320 for t in peak_times), f"peak not near burst: {peak_times}"
 
 
@@ -68,7 +73,6 @@ def test_density_empty_chat():
 
 
 def test_density_hype_emotes_boost_score():
-    # Two windows with same message count; one has hype emotes — should score higher.
     base = [_msg(float(i)) for i in range(100)]
     plain_burst = [_msg(200.0 + i * 0.2) for i in range(20)]
     hyped_burst = [_msg(400.0 + i * 0.2, hype=2) for i in range(20)]
@@ -94,7 +98,6 @@ def test_dedupe_merges_close_events():
     result = _dedupe(raw, window_s=60)
     assert len(result) == 2
     times = {c.t_center for c in result}
-    # 100, 110, 115 all within 60s of the first — merged into one (centered on 110 as highest score)
     assert any(abs(t - 110.0) < 1 for t in times)
     assert any(abs(t - 300.0) < 1 for t in times)
 
@@ -116,12 +119,12 @@ def test_dedupe_preserves_distinct_events():
     assert len(result) == 5
 
 
-# ── build_candidates integration ─────────────────────────────────────────────
+# ── build_candidates ──────────────────────────────────────────────────────────
 
 
 def test_existing_clip_gets_boost():
     cfg = _cfg(existing_clip_boost=100.0, clip_command_boost=25.0, density_peak_multiplier=99.0)
-    chat = _chat([_msg(float(i * 5)) for i in range(20)])  # sparse, no density peaks
+    chat = _chat([_msg(float(i * 5)) for i in range(20)])
     clips = [_clip(offset=300, clip_id="c1", views=500)]
 
     candidates = build_candidates(chat, clips, cfg)
@@ -150,7 +153,7 @@ def test_candidates_sorted_by_score_descending():
     msgs.append(_msg(100.0, "!clip", "a"))
     msgs.append(_msg(200.0, "!clip", "b"))
     chat = _chat(msgs)
-    clips = [_clip(offset=200, clip_id="c1")]  # overlap with !clip at 200 — merged, big score
+    clips = [_clip(offset=200, clip_id="c1")]
 
     candidates = build_candidates(chat, clips, cfg)
     scores = [c.score for c in candidates]
@@ -164,13 +167,6 @@ def test_no_candidates_for_completely_empty_data():
 
 
 # ── transcript hype signal ────────────────────────────────────────────────────
-
-
-def _transcript(segments: list[tuple[float, float, str]]):
-    from clipsmith.models.transcript import Segment, Transcript
-
-    segs = [Segment(start=s, end=e, text=t, words=[]) for s, e, t in segments]
-    return Transcript(video_id="v1", language="es", segments=segs)
 
 
 def test_transcript_hype_keyword_creates_candidate():
@@ -202,10 +198,10 @@ def test_transcript_no_hype_no_candidate():
 def test_transcript_hype_merges_with_clip_command():
     cfg = _cfg(clip_command_boost=25.0, transcript_hype_score=12.0, density_peak_multiplier=99.0)
     msgs = [_msg(100.0, "!clip")]
-    tr = _transcript([(101.0, 103.0, "jajaja wow")])  # within 60s dedupe window
+    tr = _transcript([(101.0, 103.0, "jajaja wow")])
     candidates = build_candidates(_chat(msgs), [], cfg, transcript=tr)
     merged = [
         c for c in candidates if "clip_command" in c.sources and "transcript_hype" in c.sources
     ]
     assert merged, "clip_command and nearby transcript_hype should merge"
-    assert merged[0].score > 25.0  # combined score
+    assert merged[0].score > 25.0

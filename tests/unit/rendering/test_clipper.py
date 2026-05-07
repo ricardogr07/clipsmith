@@ -1,6 +1,7 @@
-"""Tests for clipper.py — slug generation and video filter construction."""
+"""Tests for rendering.clipper — slug generation and video filter construction."""
 
 from __future__ import annotations
+
 from pathlib import Path
 
 from clipsmith.rendering.clipper import (
@@ -43,8 +44,6 @@ def test_slug_spaces_become_underscores() -> None:
 
 
 def test_video_filter_center(tmp_path: object) -> None:
-    from pathlib import Path
-
     ass = Path(str(tmp_path)) / "sub.ass"  # type: ignore[arg-type]
     vf = _video_filter(ReframeConfig(mode="center"), ass)
     assert "crop=ih*9/16:ih" in vf
@@ -53,8 +52,6 @@ def test_video_filter_center(tmp_path: object) -> None:
 
 
 def test_video_filter_webcam(tmp_path: object) -> None:
-    from pathlib import Path
-
     ass = Path(str(tmp_path)) / "sub.ass"  # type: ignore[arg-type]
     reframe = ReframeConfig(mode="webcam", webcam_rect=[100, 200, 400, 711])
     vf = _video_filter(reframe, ass)
@@ -63,19 +60,14 @@ def test_video_filter_webcam(tmp_path: object) -> None:
 
 
 def test_video_filter_webcam_no_rect_falls_back_to_center(tmp_path: object) -> None:
-    from pathlib import Path
-
     ass = Path(str(tmp_path)) / "sub.ass"  # type: ignore[arg-type]
     vf = _video_filter(ReframeConfig(mode="webcam", webcam_rect=None), ass)
     assert "crop=ih*9/16:ih" in vf
 
 
 def test_video_filter_escapes_windows_path(tmp_path: object) -> None:
-    from pathlib import Path
-
     ass = Path(str(tmp_path)) / "sub.ass"  # type: ignore[arg-type]
     vf = _video_filter(ReframeConfig(mode="center"), ass)
-    # No raw backslashes should appear in the filter string
     assert "\\" not in vf.split("subtitles=")[1].replace("\\:", "")
 
 
@@ -146,14 +138,14 @@ def test_stacked_filter_no_webcam_rect_falls_back_to_center_top() -> None:
     cfg = _stacked_cfg(webcam_rect=None, gameplay_rect=[0, 0, 1920, 1080])
     fc = _stacked_filter_complex(cfg, None)
     chains = fc.split(";")
-    assert "crop=ih*9/16:ih" in chains[0]  # top chain uses center fallback
+    assert "crop=ih*9/16:ih" in chains[0]
 
 
 def test_stacked_filter_no_gameplay_rect_falls_back_to_center_bot() -> None:
     cfg = _stacked_cfg(webcam_rect=[0, 0, 400, 300], gameplay_rect=None)
     fc = _stacked_filter_complex(cfg, None)
     chains = fc.split(";")
-    assert "crop=ih*9/16:ih" in chains[1]  # bottom chain uses center fallback
+    assert "crop=ih*9/16:ih" in chains[1]
 
 
 def test_stacked_filter_split_ratio_pixel_heights() -> None:

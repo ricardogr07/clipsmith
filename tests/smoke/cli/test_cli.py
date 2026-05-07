@@ -12,11 +12,10 @@ runner = CliRunner()
 
 
 def _plain(output: str) -> str:
-    """Strip ANSI escape codes for environment-agnostic assertions."""
     return re.sub(r"\x1b\[[0-9;]*[mGKHF]", "", output)
 
 
-def test_root_help():
+def test_root_help() -> None:
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     out = _plain(result.output)
@@ -26,7 +25,7 @@ def test_root_help():
     assert "clip" in out
 
 
-def test_process_help_shows_all_flags():
+def test_process_help_shows_all_flags() -> None:
     result = runner.invoke(app, ["process", "--help"])
     assert result.exit_code == 0
     out = _plain(result.output)
@@ -36,12 +35,12 @@ def test_process_help_shows_all_flags():
     assert "--provider" in out
 
 
-def test_process_rejects_missing_file(tmp_path):
+def test_process_rejects_missing_file(tmp_path) -> None:
     result = runner.invoke(app, ["process", str(tmp_path / "missing.mp4")])
     assert result.exit_code != 0
 
 
-def test_process_rejects_non_mp4(tmp_path):
+def test_process_rejects_non_mp4(tmp_path) -> None:
     f = tmp_path / "video.avi"
     f.write_text("x")
     result = runner.invoke(app, ["process", str(f)])
@@ -49,7 +48,7 @@ def test_process_rejects_non_mp4(tmp_path):
     assert ".mp4" in _plain(result.output)
 
 
-def test_run_vod_help_shows_captions_reframe():
+def test_run_vod_help_shows_captions_reframe() -> None:
     result = runner.invoke(app, ["run-vod", "--help"])
     assert result.exit_code == 0
     out = _plain(result.output)
@@ -57,7 +56,7 @@ def test_run_vod_help_shows_captions_reframe():
     assert "--reframe" in out
 
 
-def test_clip_help_shows_captions_reframe():
+def test_clip_help_shows_captions_reframe() -> None:
     result = runner.invoke(app, ["clip", "--help"])
     assert result.exit_code == 0
     out = _plain(result.output)
@@ -65,25 +64,25 @@ def test_clip_help_shows_captions_reframe():
     assert "--reframe" in out
 
 
-def test_setup_rejects_invalid_provider():
+def test_setup_rejects_invalid_provider() -> None:
     result = runner.invoke(app, ["setup", "--provider", "badprovider", "--key", "sk-test"])
     assert result.exit_code != 0
     assert "Unknown provider" in _plain(result.output)
 
 
-def test_setup_accepts_anthropic_provider(tmp_path, monkeypatch):
+def test_setup_accepts_anthropic_provider(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr("sys.executable", str(tmp_path / "clipsmith.exe"))
     result = runner.invoke(app, ["setup", "--provider", "anthropic", "--key", "sk-ant-test"])
     assert "ANTHROPIC_API_KEY" in _plain(result.output)
 
 
-def test_setup_accepts_openai_provider(tmp_path, monkeypatch):
+def test_setup_accepts_openai_provider(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr("sys.executable", str(tmp_path / "clipsmith.exe"))
     result = runner.invoke(app, ["setup", "--provider", "openai", "--key", "sk-openai-test"])
     assert "OPENAI_API_KEY" in _plain(result.output)
 
 
-def test_reframe_help_shows_command():
+def test_reframe_help_shows_command() -> None:
     result = runner.invoke(app, ["reframe", "--help"])
     assert result.exit_code == 0
     out = _plain(result.output)

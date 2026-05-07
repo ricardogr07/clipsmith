@@ -1,4 +1,4 @@
-"""Tests for OllamaProvider — mocks ollama via sys.modules, no real server needed."""
+"""Integration tests for llm.ollama_provider — ollama mocked via sys.modules."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from clipsmith.models.candidates import CandidateMoment
 from clipsmith.llm.ollama_provider import OllamaProvider
+from clipsmith.models.candidates import CandidateMoment
 
 
 def _candidate() -> CandidateMoment:
@@ -23,7 +23,6 @@ def _ollama_response(payload: dict) -> SimpleNamespace:
 
 
 def _mock_ollama_module(return_value=None, side_effect=None) -> MagicMock:
-    """Return a fake ollama module with a mocked .chat()."""
     mod = MagicMock()
     if side_effect is not None:
         mod.chat.side_effect = side_effect
@@ -48,7 +47,7 @@ _EXCLUDE_PAYLOAD = {
 }
 
 
-def test_ollama_pick_include():
+def test_ollama_pick_include() -> None:
     provider = OllamaProvider(model="llama3.1:8b")
     mock_mod = _mock_ollama_module(return_value=_ollama_response(_INCLUDE_PAYLOAD))
     with patch.dict(sys.modules, {"ollama": mock_mod}):
@@ -58,7 +57,7 @@ def test_ollama_pick_include():
     assert result.title_es == "momento épico"
 
 
-def test_ollama_pick_exclude():
+def test_ollama_pick_exclude() -> None:
     provider = OllamaProvider(model="llama3.1:8b")
     mock_mod = _mock_ollama_module(return_value=_ollama_response(_EXCLUDE_PAYLOAD))
     with patch.dict(sys.modules, {"ollama": mock_mod}):
@@ -67,15 +66,14 @@ def test_ollama_pick_exclude():
     assert result.include is False
 
 
-def test_ollama_pick_import_error():
+def test_ollama_pick_import_error() -> None:
     provider = OllamaProvider()
-    # sys.modules["ollama"] = None causes `import ollama` to raise ImportError
     with patch.dict(sys.modules, {"ollama": None}):  # type: ignore[dict-item]
         with pytest.raises(RuntimeError, match="pip install"):
             provider.pick("transcript", _candidate(), "context")
 
 
-def test_ollama_pick_network_error():
+def test_ollama_pick_network_error() -> None:
     provider = OllamaProvider(model="llama3.1:8b")
     mock_mod = _mock_ollama_module(side_effect=ConnectionError("ollama not running"))
     with patch.dict(sys.modules, {"ollama": mock_mod}):
@@ -83,7 +81,7 @@ def test_ollama_pick_network_error():
     assert result is None
 
 
-def test_ollama_pick_malformed_json():
+def test_ollama_pick_malformed_json() -> None:
     provider = OllamaProvider(model="llama3.1:8b")
     bad_resp = SimpleNamespace(message=SimpleNamespace(content="this is not json {{{"))
     mock_mod = _mock_ollama_module(return_value=bad_resp)
