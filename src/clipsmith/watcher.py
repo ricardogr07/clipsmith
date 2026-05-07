@@ -7,9 +7,10 @@ import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from .models.twitch import Video
 from .settings import AppConfig, Secrets
 from .state import State
-from .twitch_client import TwitchClient, Video
+from .twitch_client import TwitchClient
 
 log = logging.getLogger(__name__)
 

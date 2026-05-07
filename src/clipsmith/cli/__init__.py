@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import typer
 
-from .cli_clip import clip_cmd, reframe_cmd
-from .cli_cloud import cloud_app
-from .cli_run import process, run_vod, watch, whoami
-from .cli_setup import check_ollama, detect_webcam_cmd, setup
+from .clip import clip_cmd, reframe_cmd
+from .cloud import cloud_app
+from .run import process, run_vod, watch, whoami
+from .setup import check_ollama, detect_webcam_cmd, setup
 
 app = typer.Typer(add_completion=False, help="Twitch -> AI clip pipeline")
 

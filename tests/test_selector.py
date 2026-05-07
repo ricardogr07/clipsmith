@@ -8,9 +8,9 @@ import pytest
 
 from clipsmith.candidates import CandidateMoment
 from clipsmith.llm.base import ClipPick
+from clipsmith.llm.prompts import build_stream_context
 from clipsmith.selector import (
     _extract_transcript_window,
-    build_stream_context,
     select_clips,
 )
 from clipsmith.settings import ClipConfig
@@ -26,12 +26,18 @@ def _candidate(t: float = 300.0, score: float = 50.0) -> CandidateMoment:
 
 
 def _cfg(**kwargs: object) -> ClipConfig:
-    defaults: dict[str, object] = {"min_seconds": 15, "max_seconds": 30, "preroll_s": 25, "postroll_s": 10}
+    defaults: dict[str, object] = {
+        "min_seconds": 15,
+        "max_seconds": 30,
+        "preroll_s": 25,
+        "postroll_s": 10,
+    }
     defaults.update(kwargs)
     return ClipConfig(**defaults)  # type: ignore[arg-type]
 
 
 # ── transcript window extraction ──────────────────────────────────────────────
+
 
 def test_extract_window_includes_segments_in_range() -> None:
     t = _transcript(
@@ -64,12 +70,16 @@ def test_extract_window_has_relative_timestamps() -> None:
 
 # ── select_clips with mock picker ─────────────────────────────────────────────
 
+
 class _AcceptAll:
     """Mock picker that accepts every candidate."""
+
     def __init__(self) -> None:
         self.calls: list[CandidateMoment] = []
 
-    def pick(self, transcript_window: str, candidate: CandidateMoment, stream_context: str) -> ClipPick:
+    def pick(
+        self, transcript_window: str, candidate: CandidateMoment, stream_context: str
+    ) -> ClipPick:
         self.calls.append(candidate)
         return ClipPick(
             include=True,
@@ -82,7 +92,10 @@ class _AcceptAll:
 
 class _RejectAll:
     """Mock picker that rejects every candidate."""
-    def pick(self, transcript_window: str, candidate: CandidateMoment, stream_context: str) -> ClipPick:
+
+    def pick(
+        self, transcript_window: str, candidate: CandidateMoment, stream_context: str
+    ) -> ClipPick:
         return ClipPick(
             include=False,
             start_offset_s=0.0,
@@ -94,6 +107,7 @@ class _RejectAll:
 
 class _FailAll:
     """Mock picker that always errors."""
+
     def pick(self, transcript_window: str, candidate: CandidateMoment, stream_context: str) -> None:
         return None
 
@@ -130,12 +144,15 @@ def test_select_clips_fail_treated_as_skip() -> None:
 def test_select_clips_respects_max_candidates() -> None:
     candidates = [_candidate(float(i * 100), float(100 - i)) for i in range(10)]
     picker = _AcceptAll()
-    select_clips(candidates, _make_transcript_with_content(), picker, "ctx", _cfg(), max_candidates=3)  # type: ignore[arg-type]
+    select_clips(
+        candidates, _make_transcript_with_content(), picker, "ctx", _cfg(), max_candidates=3
+    )  # type: ignore[arg-type]
     assert len(picker.calls) == 3
 
 
 def test_select_clips_clamped_duration() -> None:
     """The picker returns a 60s clip; select_clips should clamp it to 30s."""
+
     class _LongPick:
         def pick(self, tw: str, c: CandidateMoment, sc: str) -> ClipPick:
             return ClipPick(
@@ -145,9 +162,14 @@ def test_select_clips_clamped_duration() -> None:
                 title_es="Largo",
                 reason="test",
             )
+
     candidates = [_candidate(300.0)]
     picks = select_clips(
-        candidates, _make_transcript_with_content(), _LongPick(), "ctx", _cfg(max_seconds=30)  # type: ignore[arg-type]
+        candidates,
+        _make_transcript_with_content(),
+        _LongPick(),
+        "ctx",
+        _cfg(max_seconds=30),  # type: ignore[arg-type]
     )
     assert len(picks) == 1
     assert picks[0].pick.duration_s == pytest.approx(30.0)

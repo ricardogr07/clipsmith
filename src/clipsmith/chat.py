@@ -2,66 +2,22 @@
 
 from __future__ import annotations
 
-import json
 import logging
-from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Self
 
 import httpx
 
+from .models.chat import HYPE_EMOTES, ChatLog, ChatMessage
+
 log = logging.getLogger(__name__)
 
-# Emotes associated with hype/laughter moments (cross-language).
-HYPE_EMOTES = frozenset(
-    {
-        "KEKW",
-        "OMEGALUL",
-        "LUL",
-        "PogChamp",
-        "Pog",
-        "PogO",
-        "LULW",
-        "KEKLEO",
-        "xD",
-        "JAJAJA",
-        "monkaS",
-        "GIGACHAD",
-        "widepeepoHappy",
-        "Pepega",
-        "OMEGALUL",
-        "EZ",
-    }
-)
+# Re-export models so existing imports from this module keep working.
+__all__ = ["ChatMessage", "ChatLog", "HYPE_EMOTES", "download_chat"]
 
 _GQL_URL = "https://gql.twitch.tv/gql"
 _CLIENT_ID = "kd1unb4b3q4t58fwlpcbzcbnm76a8fp"
 # Hash for VideoCommentsByOffsetOrCursor — verified working as of 2026-05.
 _COMMENTS_HASH = "b70a3591ff0f4e0313d126c6a1502d79a1c02baebb288227c582044aa76adf6a"
-
-
-@dataclass
-class ChatMessage:
-    time_in_seconds: float
-    message: str
-    author: str
-    is_clip_command: bool  # message starts with !clip
-    hype_emote_count: int  # number of HYPE_EMOTES found in message
-
-
-@dataclass
-class ChatLog:
-    video_id: str
-    messages: list[ChatMessage]
-
-    def to_json(self) -> str:
-        return json.dumps(asdict(self), ensure_ascii=False, indent=2)
-
-    @classmethod
-    def from_json(cls: type[Self], text: str) -> Self:
-        d = json.loads(text)
-        d["messages"] = [ChatMessage(**m) for m in d["messages"]]
-        return cls(**d)
 
 
 def download_chat(
@@ -152,7 +108,6 @@ def _parse_node(node: dict) -> ChatMessage | None:
     author = commenter.get("login") or commenter.get("displayName") or ""
 
     fragments = (node.get("message") or {}).get("fragments") or []
-    # Fragments can be plain text or emote references — concatenate text fields.
     msg = "".join(f.get("text") or "" for f in fragments).strip()
 
     is_clip = msg.lower().startswith("!clip")

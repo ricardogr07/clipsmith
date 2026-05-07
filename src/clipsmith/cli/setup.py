@@ -13,11 +13,11 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from .cli_utils import _resolve_config
-from .clipper import _find_ffmpeg
-from .detect import detect_webcam_rect
-from .pipeline import _setup_logging
-from .settings import load_config
+from .utils import _resolve_config
+from ..clipper import _find_ffmpeg
+from ..detect import detect_webcam_rect
+from ..pipeline import _setup_logging
+from ..settings import load_config
 
 console = Console()
 log = logging.getLogger(__name__)

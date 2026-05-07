@@ -7,19 +7,33 @@ import logging
 from rich.console import Console
 from rich.logging import RichHandler
 
-from .candidates import CandidateMoment, build_candidates, save_candidates
+import json
+from pathlib import Path
+
+from .candidates import build_candidates, save_candidates
 from .chat import download_chat
 from .clipper import cut_all_clips
 from .detect import load_or_detect_webcam_rect
 from .downloader import download_vod
 from .llm import get_provider
-from .selector import build_stream_context, save_picks, select_clips
+from .llm.prompts import build_stream_context
+from .models.candidates import CandidateMoment
+from .models.twitch import Video
+from .selector import PickResult, select_clips
 from .settings import AppConfig, Secrets
 from .transcribe import transcribe
-from .twitch_client import TwitchClient, Video
+from .twitch_client import TwitchClient
 
 console = Console()
 log = logging.getLogger(__name__)
+
+
+def save_picks(picks: list[PickResult], path: Path) -> None:
+    """Serialize accepted picks to JSON."""
+    path.write_text(
+        json.dumps([p.to_dict() for p in picks], ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
 
 def _setup_logging(verbose: bool) -> None:
@@ -30,7 +44,7 @@ def _setup_logging(verbose: bool) -> None:
     )
 
 
-def _process_vod(
+def process_vod(
     video: Video,
     cfg: AppConfig,
     secrets: Secrets,

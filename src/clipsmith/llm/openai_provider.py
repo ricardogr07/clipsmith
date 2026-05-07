@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import logging
 
-from ..candidates import CandidateMoment
-from .base import SYSTEM_PROMPT, ClipPick
-from .anthropic_provider import _build_candidate_prompt
+from ..models.candidates import CandidateMoment
+from .base import ClipPick
+from .prompts import SYSTEM_PROMPT, build_candidate_prompt
 
 log = logging.getLogger(__name__)
 
@@ -22,9 +22,7 @@ class OpenAIProvider:
         try:
             import openai as _openai
         except ImportError as exc:
-            raise ImportError(
-                "openai package required: pip install openai"
-            ) from exc
+            raise ImportError("openai package required: pip install openai") from exc
         self._client = _openai.OpenAI(api_key=api_key)
         self._model = model
 
@@ -34,7 +32,7 @@ class OpenAIProvider:
         candidate: CandidateMoment,
         stream_context: str,
     ) -> ClipPick | None:
-        candidate_prompt = _build_candidate_prompt(transcript_window, candidate)
+        candidate_prompt = build_candidate_prompt(transcript_window, candidate)
         try:
             response = self._client.chat.completions.create(
                 model=self._model,
@@ -53,7 +51,11 @@ class OpenAIProvider:
             text = response.choices[0].message.content or ""
             usage = response.usage
             if usage:
-                cached = getattr(usage.prompt_tokens_details, "cached_tokens", 0) if hasattr(usage, "prompt_tokens_details") else 0
+                cached = (
+                    getattr(usage.prompt_tokens_details, "cached_tokens", 0)
+                    if hasattr(usage, "prompt_tokens_details")
+                    else 0
+                )
                 log.debug(
                     "OpenAI usage: prompt=%d cached=%d completion=%d",
                     usage.prompt_tokens,

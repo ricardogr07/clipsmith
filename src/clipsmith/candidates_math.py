@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .chat import ChatMessage
+from .models.chat import ChatMessage
 
 
 def compute_density_scores(
@@ -33,9 +33,7 @@ def compute_density_scores(
     results: list[tuple[float, float]] = []
     t = t_min
     while t <= t_max:
-        window_msgs = [
-            m for m in messages if t <= m.time_in_seconds < t + window_s
-        ]
+        window_msgs = [m for m in messages if t <= m.time_in_seconds < t + window_s]
         count = len(window_msgs)
         hype = sum(m.hype_emote_count for m in window_msgs)
         raw_score = count + 0.5 * hype

@@ -6,7 +6,22 @@ import json
 from dataclasses import asdict, dataclass
 from typing import Protocol, Self, runtime_checkable
 
-from ..candidates import CandidateMoment
+from ..models.candidates import CandidateMoment
+from .prompts import (
+    CLIP_PICK_JSON_SCHEMA,
+    SYSTEM_PROMPT,
+    build_candidate_prompt,
+    build_stream_context,
+)
+
+__all__ = [
+    "ClipPick",
+    "ClipPicker",
+    "SYSTEM_PROMPT",
+    "CLIP_PICK_JSON_SCHEMA",
+    "build_candidate_prompt",
+    "build_stream_context",
+]
 
 
 @dataclass
@@ -17,7 +32,6 @@ class ClipPick:
     title_es: str
     reason: str
 
-    # Duration convenience.
     @property
     def duration_s(self) -> float:
         return self.end_offset_s - self.start_offset_s
@@ -59,56 +73,3 @@ class ClipPicker(Protocol):
         or None if the provider failed (caller should treat as skip).
         """
         ...
-
-
-# JSON schema returned by the LLM — used for validation and provider prompts.
-CLIP_PICK_JSON_SCHEMA: dict = {
-    "type": "object",
-    "properties": {
-        "include": {
-            "type": "boolean",
-            "description": "true = make a clip from this moment, false = skip it",
-        },
-        "start_offset_s": {
-            "type": "number",
-            "description": "Seconds into the VOD where the clip should start",
-        },
-        "end_offset_s": {
-            "type": "number",
-            "description": "Seconds into the VOD where the clip should end (15–30 s after start)",
-        },
-        "title_es": {
-            "type": "string",
-            "description": "3–6 word Spanish title for TikTok/Shorts (catchy, no spoilers)",
-        },
-        "reason": {
-            "type": "string",
-            "description": "1–2 sentence English explanation of why this moment is (or isn't) clip-worthy",
-        },
-    },
-    "required": ["include", "start_offset_s", "end_offset_s", "title_es", "reason"],
-    "additionalProperties": False,
-}
-
-SYSTEM_PROMPT = """\
-You are a clip-selection assistant for a Spanish-language Twitch streamer targeting TikTok and YouTube Shorts.
-
-Your task: given a VOD transcript window and viewer-signal context, decide whether the highlighted moment
-is genuinely clip-worthy as a standalone short video (15–30 seconds).
-
-Respond ONLY with a valid JSON object matching this schema (no markdown, no extra text):
-{
-  "include": <bool>,           // true = make a clip, false = skip
-  "start_offset_s": <number>,  // VOD seconds where clip starts
-  "end_offset_s": <number>,    // VOD seconds where clip ends (must be 15–30 s after start)
-  "title_es": <string>,        // 3–6 word Spanish title for social media
-  "reason": <string>           // 1–2 sentences in English explaining your decision
-}
-
-Rules:
-- Only include moments that would be entertaining or surprising as standalone clips with NO prior context.
-- If the moment is mid-conversation filler, cut off, or requires setup to make sense, set include: false.
-- The clip window must be 15–30 seconds. Adjust start/end relative to the candidate center.
-- title_es must be in Spanish and suitable for social media captions.
-- If include is false, still fill start_offset_s/end_offset_s with a best estimate and title_es with a placeholder.\
-"""

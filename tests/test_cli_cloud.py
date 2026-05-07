@@ -119,8 +119,8 @@ def test_cloud_run_dry_run(tmp_path: Path) -> None:
     mock_uploader = MagicMock()
 
     with (
-        patch("clipsmith.cli_cloud.run_vod_on_aci", mock_runner),
-        patch("clipsmith.cli_cloud.upload_clips", mock_uploader),
+        patch("clipsmith.cli.cloud.run_vod_on_aci", mock_runner),
+        patch("clipsmith.cli.cloud.upload_clips", mock_uploader),
     ):
         result = runner.invoke(
             app,
@@ -148,7 +148,7 @@ def test_cloud_run_uses_today_as_default_date(tmp_path: Path) -> None:
     cfg.write_text("cloud:\n  docker_image: ricardogr007/clipsmith:latest\n")
 
     # Mirror download_output structure: <tmpdir>/<vod_id>/clip_01.mp4
-    # so cli_cloud's shutil.rmtree(clips[0].parent.parent) removes tmp_path, not its parent.
+    # so cloud_run's shutil.rmtree(clips[0].parent.parent) removes tmp_path, not its parent.
     vod_dir = tmp_path / "123456"
     vod_dir.mkdir()
     fake_clip = vod_dir / "clip_01.mp4"
@@ -158,8 +158,8 @@ def test_cloud_run_uses_today_as_default_date(tmp_path: Path) -> None:
     mock_uploader = MagicMock(return_value="https://drive.google.com/fake")
 
     with (
-        patch("clipsmith.cli_cloud.run_vod_on_aci", mock_runner),
-        patch("clipsmith.cli_cloud.upload_clips", mock_uploader),
+        patch("clipsmith.cli.cloud.run_vod_on_aci", mock_runner),
+        patch("clipsmith.cli.cloud.upload_clips", mock_uploader),
     ):
         result = runner.invoke(
             app,

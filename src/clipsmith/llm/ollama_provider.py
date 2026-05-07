@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 
-from ..candidates import CandidateMoment
-from .base import ClipPick, SYSTEM_PROMPT
+from ..models.candidates import CandidateMoment
+from .base import ClipPick
+from .prompts import SYSTEM_PROMPT
 
 log = logging.getLogger(__name__)
 

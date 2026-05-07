@@ -2,58 +2,22 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import subprocess  # nosec B403
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Self
+from typing import Any
 
+from .io.media import video_duration
+from .models.transcript import Segment, Transcript, Word
 from .settings import TranscribeConfig
 
 log = logging.getLogger(__name__)
 
-
-@dataclass
-class Word:
-    start: float  # seconds
-    end: float
-    word: str
-    probability: float
-
-
-@dataclass
-class Segment:
-    start: float
-    end: float
-    text: str
-    words: list[Word]
-
-
-@dataclass
-class Transcript:
-    video_id: str
-    language: str
-    segments: list[Segment]
-
-    def to_json(self) -> str:
-        return json.dumps(asdict(self), ensure_ascii=False, indent=2)
-
-    @classmethod
-    def from_json(cls: type[Self], text: str) -> Self:
-        d = json.loads(text)
-        d["segments"] = [
-            Segment(
-                start=s["start"],
-                end=s["end"],
-                text=s["text"],
-                words=[Word(**w) for w in s.get("words", [])],
-            )
-            for s in d["segments"]
-        ]
-        return cls(**d)
+# Re-export models so existing imports from this module keep working
+# during the transition; downstream code should prefer models.transcript.
+__all__ = ["Word", "Segment", "Transcript", "transcribe"]
 
 
 def _extract_audio_chunk(mp4: Path, start_s: float, duration_s: float, out_wav: Path) -> None:
@@ -74,7 +38,7 @@ def _extract_audio_chunk(mp4: Path, start_s: float, duration_s: float, out_wav: 
         "1",
         str(out_wav),
     ]
-    subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # nosec B603 — cmd built from internal paths and config values only
+    subprocess.check_call(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # nosec B603
 
 
 def _transcribe_chunk(
@@ -124,7 +88,7 @@ def _merge_segments(
     """
     merged: list[Segment] = []
     for i, segs in enumerate(chunks):
-        cutoff = chunk_starts[i]  # segments before this were already covered by the previous chunk
+        cutoff = chunk_starts[i]
         for seg in segs:
             if seg.start >= cutoff:
                 merged.append(seg)
@@ -137,10 +101,8 @@ def _chunked_transcribe(
     video_id: str,
     config: TranscribeConfig,
     out_path: Path,
-) -> "Transcript":
+) -> Transcript:
     """Split audio into chunks, transcribe in parallel, merge results."""
-    from .detect import _video_duration  # avoid circular at module level
-
     try:
         from faster_whisper import WhisperModel
     except ImportError as exc:
@@ -148,11 +110,10 @@ def _chunked_transcribe(
             "faster-whisper is required for transcription: pip install faster-whisper"
         ) from exc
 
-    duration = _video_duration(mp4)
+    duration = video_duration(mp4)
     chunk_s = config.chunk_minutes * 60
     overlap_s = config.chunk_overlap_s
 
-    # Build chunk (start, extract_duration) pairs
     chunk_starts: list[float] = []
     slices: list[tuple[float, float]] = []
     t = 0.0
@@ -229,7 +190,6 @@ def transcribe(
     if config.chunk_minutes > 0:
         return _chunked_transcribe(mp4_path, video_id, config, out_path)
 
-    # Import here so the package is importable even without faster-whisper installed.
     try:
         from faster_whisper import WhisperModel
     except ImportError as exc:

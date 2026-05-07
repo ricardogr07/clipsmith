@@ -9,15 +9,15 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from .candidates import CandidateMoment
-from .clipper import _cut_one, _title_slug, cut_all_clips
-from .cli_utils import _resolve_config
-from .detect import load_or_detect_webcam_rect
-from .llm.base import ClipPick
-from .pipeline import _setup_logging
-from .selector import PickResult
-from .settings import load_config
-from .transcribe import Transcript
+from .utils import _resolve_config
+from ..clipper import _cut_one, _title_slug, cut_all_clips
+from ..detect import load_or_detect_webcam_rect
+from ..llm.base import ClipPick
+from ..models.candidates import CandidateMoment
+from ..models.transcript import Transcript
+from ..pipeline import _setup_logging
+from ..selector import PickResult
+from ..settings import load_config
 
 console = Console()
 log = logging.getLogger(__name__)

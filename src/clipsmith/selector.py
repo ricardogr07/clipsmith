@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import asdict, dataclass
-from pathlib import Path
 
-from .candidates import CandidateMoment
 from .llm.base import ClipPick, ClipPicker
+from .models.candidates import CandidateMoment
+from .models.transcript import Transcript
 from .settings import ClipConfig
-from .transcribe import Transcript
 
 log = logging.getLogger(__name__)
 
@@ -123,27 +121,7 @@ def _clamp_duration(pick: ClipPick, config: ClipConfig) -> ClipPick:
     """Ensure the clip is within [min_seconds, max_seconds]."""
     duration = pick.end_offset_s - pick.start_offset_s
     if duration < config.min_seconds:
-        # Extend end until minimum is met.
         pick.end_offset_s = pick.start_offset_s + config.min_seconds
     elif duration > config.max_seconds:
-        # Trim end to maximum.
         pick.end_offset_s = pick.start_offset_s + config.max_seconds
     return pick
-
-
-def build_stream_context(channel: str, vod_title: str, vod_duration: str) -> str:
-    return (
-        f"Stream context:\n"
-        f"Channel: {channel}\n"
-        f"VOD title: {vod_title}\n"
-        f"Duration: {vod_duration}\n"
-        f"Language: Spanish\n"
-        f"Platform: Twitch (clips for TikTok/YouTube Shorts)\n"
-    )
-
-
-def save_picks(picks: list[PickResult], path: Path) -> None:
-    path.write_text(
-        json.dumps([p.to_dict() for p in picks], ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )

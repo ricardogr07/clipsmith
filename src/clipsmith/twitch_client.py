@@ -3,40 +3,18 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 import httpx
 
+from .models.twitch import Clip, Video
+
+# Re-export models so existing imports from this module keep working.
+__all__ = ["Video", "Clip", "TwitchClient"]
+
 HELIX = "https://api.twitch.tv/helix"
-OAUTH_TOKEN_URL = "https://id.twitch.tv/oauth2/token"  # nosec B105 — public OAuth endpoint URL, not a credential
-
-
-@dataclass
-class Video:
-    id: str
-    user_id: str
-    user_login: str
-    title: str
-    created_at: str
-    published_at: str
-    url: str
-    duration: str  # e.g. "3h21m4s"
-    type: str  # archive | upload | highlight
-
-
-@dataclass
-class Clip:
-    id: str
-    url: str
-    title: str
-    creator_name: str
-    video_id: str
-    vod_offset: int | None  # seconds into source VOD
-    duration: float
-    view_count: int
-    created_at: str
+OAUTH_TOKEN_URL = "https://id.twitch.tv/oauth2/token"  # nosec B105
 
 
 class TwitchClient:

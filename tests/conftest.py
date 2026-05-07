@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from clipsmith.transcribe import Segment, Transcript, Word
+from clipsmith.models.transcript import Segment, Transcript, Word
 
 
 def _word(start: float, end: float, text: str) -> Word:

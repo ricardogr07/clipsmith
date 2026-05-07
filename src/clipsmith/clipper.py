@@ -11,9 +11,9 @@ import unicodedata
 from pathlib import Path
 
 from .captions import _write_ass
+from .models.transcript import Transcript
 from .selector import PickResult
 from .settings import AppConfig, ReframeConfig
-from .transcribe import Transcript
 
 log = logging.getLogger(__name__)
 

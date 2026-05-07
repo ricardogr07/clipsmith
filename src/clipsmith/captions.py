@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .models.transcript import Transcript, Word
 from .settings import CaptionConfig
-from .transcribe import Transcript, Word
 
 _WORDS_PER_LINE = 5
 _MAX_LINE_CHARS = 28
@@ -59,10 +59,7 @@ def _group_words(words: list[Word], clip_start: float) -> list[tuple[float, floa
 def _make_karaoke_line(words: list[Word], clip_start: float) -> tuple[float, float, str]:
     rel_start = max(0.0, words[0].start - clip_start)
     rel_end = max(rel_start + 0.1, words[-1].end - clip_start)
-    parts = [
-        f"{{\\kf{max(1, round((w.end - w.start) * 100))}}}{w.word.strip()}"
-        for w in words
-    ]
+    parts = [f"{{\\kf{max(1, round((w.end - w.start) * 100))}}}{w.word.strip()}" for w in words]
     return rel_start, rel_end, " ".join(parts)
 
 
@@ -133,7 +130,6 @@ def _render_ass(lines: list[tuple[float, float, str]], config: CaptionConfig) ->
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
     events = "\n".join(
-        f"Dialogue: 0,{_ass_time(s)},{_ass_time(e)},Default,,0,0,0,,{t}"
-        for s, e, t in lines
+        f"Dialogue: 0,{_ass_time(s)},{_ass_time(e)},Default,,0,0,0,,{t}" for s, e, t in lines
     )
     return header + events + "\n"

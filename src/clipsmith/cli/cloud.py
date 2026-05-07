@@ -12,10 +12,10 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from .cloud.azure_runner import run_vod_on_aci
-from .cloud.drive_upload import authorize_drive, upload_clips
-from .pipeline import _setup_logging
-from .settings import load_config, load_secrets
+from ..cloud.azure_runner import run_vod_on_aci
+from ..cloud.drive_upload import authorize_drive, upload_clips
+from ..pipeline import _setup_logging
+from ..settings import load_config, load_secrets
 
 console = Console()
 log = logging.getLogger(__name__)

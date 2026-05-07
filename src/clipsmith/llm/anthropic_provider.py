@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import logging
 
-from ..candidates import CandidateMoment
-from .base import SYSTEM_PROMPT, ClipPick
+from ..models.candidates import CandidateMoment
+from .base import ClipPick
+from .prompts import SYSTEM_PROMPT, build_candidate_prompt
 
 log = logging.getLogger(__name__)
 
@@ -22,9 +23,7 @@ class AnthropicProvider:
         try:
             import anthropic as _anthropic
         except ImportError as exc:
-            raise ImportError(
-                "anthropic package required: pip install anthropic"
-            ) from exc
+            raise ImportError("anthropic package required: pip install anthropic") from exc
         self._client = _anthropic.Anthropic(api_key=api_key)
         self._model = model
 
@@ -34,7 +33,7 @@ class AnthropicProvider:
         candidate: CandidateMoment,
         stream_context: str,
     ) -> ClipPick | None:
-        candidate_prompt = _build_candidate_prompt(transcript_window, candidate)
+        candidate_prompt = build_candidate_prompt(transcript_window, candidate)
         try:
             response = self._client.messages.create(
                 model=self._model,
@@ -74,24 +73,8 @@ class AnthropicProvider:
                 getattr(usage, "cache_creation_input_tokens", 0),
                 usage.output_tokens,
             )
-            text = next(
-                (b.text for b in response.content if b.type == "text"), ""
-            )
+            text = next((b.text for b in response.content if b.type == "text"), "")
             return ClipPick.from_json(text)
         except Exception as exc:
             log.warning("Anthropic pick failed for t=%.1f: %s", candidate.t_center, exc)
             return None
-
-
-def _build_candidate_prompt(transcript_window: str, candidate: CandidateMoment) -> str:
-    signals = "\n".join(f"- {r}" for r in candidate.reasons)
-    return (
-        f"## Candidate moment\n"
-        f"Center: t={candidate.t_center:.1f}s (VOD seconds)\n"
-        f"Score: {candidate.score:.1f}\n"
-        f"Signal sources: {', '.join(candidate.sources)}\n\n"
-        f"### Viewer signals\n{signals}\n\n"
-        f"### Transcript window (±60s around center)\n"
-        f"{transcript_window}\n\n"
-        f"Respond with JSON only."
-    )

@@ -9,6 +9,8 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .io.media import video_duration
+
 if TYPE_CHECKING:
     from .settings import ReframeConfig
 
@@ -22,24 +24,6 @@ _SAMPLE_COUNT = 20
 _MIN_HIT_RATE = 0.3
 # IOU threshold for merging rectangles into the same cluster
 _IOU_MERGE = 0.3
-
-
-def _video_duration(mp4: Path) -> float:
-    """Return video duration in seconds via ffprobe."""
-    cmd = [
-        "ffprobe",
-        "-v",
-        "error",
-        "-select_streams",
-        "v:0",
-        "-show_entries",
-        "format=duration",
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
-        str(mp4),
-    ]
-    out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, text=True).strip()  # nosec B603 — cmd contains only internal paths and ffprobe flags
-    return float(out)
 
 
 def _extract_frame(mp4: Path, t: float, out_png: Path) -> bool:
@@ -136,7 +120,7 @@ def detect_webcam_rect(
     if cascade.empty():
         raise RuntimeError(f"Failed to load Haar cascade from {cascade_path}")
 
-    duration = _video_duration(mp4)
+    duration = video_duration(mp4)
     if duration <= 0:
         raise RuntimeError(f"Could not determine duration of {mp4}")
 

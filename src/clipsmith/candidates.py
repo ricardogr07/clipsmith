@@ -11,14 +11,17 @@ Signals:
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .candidates_math import compute_density_scores
-from .chat import ChatLog
+from .models.candidates import CandidateMoment
+from .models.chat import ChatLog
+from .models.transcript import Transcript
+from .models.twitch import Clip
 from .settings import CandidatesConfig
-from .transcribe import Transcript
-from .twitch_client import Clip
+
+# Re-export so existing imports from this module keep working.
+__all__ = ["CandidateMoment", "build_candidates", "save_candidates", "load_candidates"]
 
 # Spanish/stream hype keywords that suggest a funny or exciting moment.
 _HYPE_KEYWORDS = frozenset(
@@ -47,17 +50,6 @@ _HYPE_KEYWORDS = frozenset(
         "monstro",
     }
 )
-
-
-@dataclass
-class CandidateMoment:
-    t_center: float  # seconds into VOD
-    score: float
-    sources: list[str]  # human-readable signal labels
-    reasons: list[str]  # detail strings for the LLM prompt
-
-    def to_dict(self) -> dict:
-        return asdict(self)
 
 
 def build_candidates(

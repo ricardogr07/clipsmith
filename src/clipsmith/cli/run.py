@@ -9,12 +9,13 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from .cli_utils import _parse_start_at, _resolve_config
-from .pipeline import _process_vod, _setup_logging
-from .settings import load_config, load_secrets
-from .state import State
-from .twitch_client import TwitchClient, Video
-from .watcher import watch as watch_iter
+from .utils import _parse_start_at, _resolve_config
+from ..models.twitch import Video
+from ..pipeline import process_vod, _setup_logging
+from ..settings import load_config, load_secrets
+from ..state import State
+from ..twitch_client import TwitchClient
+from ..watcher import watch as watch_iter
 
 console = Console()
 log = logging.getLogger(__name__)
@@ -84,7 +85,7 @@ def process(
     )
 
     try:
-        _process_vod(
+        process_vod(
             video,
             cfg,
             secrets,
@@ -121,7 +122,7 @@ def watch(
             f"[green]new VOD[/green]: {event.video.id}  {event.video.title!r}  ({event.video.duration})"
         )
         try:
-            _process_vod(event.video, cfg, secrets)
+            process_vod(event.video, cfg, secrets)
         except Exception as exc:
             log.exception("pipeline failed for VOD %s", event.video.id)
             console.print(f"[red]error — VOD {event.video.id} skipped:[/red] {exc}")
@@ -221,7 +222,7 @@ def run_vod(
         )
 
     try:
-        _process_vod(
+        process_vod(
             video,
             cfg,
             secrets,
