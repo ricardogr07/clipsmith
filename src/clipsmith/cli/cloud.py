@@ -14,6 +14,7 @@ from rich.table import Table
 
 from ..cloud.azure_runner import run_vod_on_aci
 from ..cloud.drive_upload import authorize_drive, upload_clips
+from ..cloud.provisioner import RunContext, provision_run_resources, teardown_run_resources
 from ..pipeline import _setup_logging
 from ..settings import load_config, load_secrets
 
@@ -33,49 +34,41 @@ def setup(
     config_path: Path = typer.Option(Path("config.yaml"), "--config", "-c"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
-    """Verify Azure infra (resource group, storage account, file shares) is ready."""
+    """Validate Azure credentials. Storage is provisioned per-run — no manual setup needed."""
     _setup_logging(verbose)
-    cfg = load_config(config_path)
     secrets = load_secrets()
+    cfg = load_config(config_path)
 
     if not secrets.azure_subscription_id:
         console.print("[red]AZURE_SUBSCRIPTION_ID not set in .env[/red]")
         raise typer.Exit(1)
-    if not secrets.azure_storage_account:
-        console.print("[red]AZURE_STORAGE_ACCOUNT not set in .env[/red]")
-        raise typer.Exit(1)
-    if not secrets.azure_storage_key:
-        console.print("[red]AZURE_STORAGE_KEY not set in .env[/red]")
-        raise typer.Exit(1)
 
     try:
-        from azure.core.credentials import AzureNamedKeyCredential
-        from azure.storage.fileshare import ShareServiceClient
+        from azure.identity import DefaultAzureCredential
+        from azure.mgmt.resource import ResourceManagementClient
+        from azure.mgmt.storage import StorageManagementClient  # noqa: F401
     except ImportError:
         console.print("[red]Azure packages not installed.[/red] Run: pip install '.[cloud]'")
         raise typer.Exit(1)
 
-    cred = AzureNamedKeyCredential(secrets.azure_storage_account, secrets.azure_storage_key)
-    svc = ShareServiceClient(
-        account_url=f"https://{secrets.azure_storage_account}.file.core.windows.net",
-        credential=cred,
-    )
-
-    shares = {s["name"] for s in svc.list_shares()}
-    missing = {"clipsmith-work", "clipsmith-out"} - shares
-    if missing:
-        console.print(f"[red]Missing file shares:[/red] {', '.join(sorted(missing))}")
-        console.print("Create them in the Azure Portal under your storage account > File shares.")
+    try:
+        rc = ResourceManagementClient(DefaultAzureCredential(), secrets.azure_subscription_id)
+        # Single auth round-trip to validate credentials
+        next(iter(rc.resource_groups.list()), None)
+    except Exception as exc:
+        console.print(f"[red]Azure auth failed:[/red] {exc}")
         raise typer.Exit(1)
 
-    console.print("[green]OK[/green] Azure storage account reachable")
-    console.print("[green]OK[/green] File shares: clipsmith-work, clipsmith-out")
-    console.print(f"\n[dim]Resource group:[/dim] {cfg.cloud.resource_group}")
+    console.print("[green]OK[/green] Azure credentials valid")
     console.print(
-        f"[dim]Docker image:[/dim]    {cfg.cloud.docker_image or '(not set in config.yaml)'}"
+        "[dim]Storage account and file shares are provisioned automatically per run.[/dim]"
+    )
+    console.print("[dim]AZURE_STORAGE_ACCOUNT and AZURE_STORAGE_KEY are no longer required.[/dim]")
+    console.print(
+        f"\n[dim]Docker image:[/dim] {cfg.cloud.docker_image or '(not set in config.yaml)'}"
     )
     console.print(
-        "\n[bold]Ready.[/bold] Next: run [cyan]clipsmith cloud build[/cyan] to push the image."
+        "\n[bold]Ready.[/bold] Run [cyan]clipsmith cloud run <vod_id> --game <name>[/cyan]"
     )
 
 
@@ -153,14 +146,39 @@ def cloud_run(
         + ("  [yellow][dry-run][/yellow]" if dry_run else "")
     )
 
-    clips = run_vod_on_aci(
-        vod_id,
-        config_path,
-        cfg,
-        secrets,
-        dry_run=dry_run,
-        verbose=verbose,
-    )
+    run_ctx: RunContext | None = None
+    clips: list[Path] = []
+
+    try:
+        if not dry_run:
+            console.print("[cyan]Provisioning[/cyan] ephemeral Azure resources ...")
+            run_ctx = provision_run_resources(vod_id, cfg, secrets)
+            console.print(
+                f"[green]Provisioned[/green]  rg={run_ctx.resource_group}"
+                f"  sa={run_ctx.storage_account}"
+            )
+
+        clips = run_vod_on_aci(
+            vod_id,
+            config_path,
+            cfg,
+            secrets,
+            run_ctx=run_ctx,
+            dry_run=dry_run,
+            verbose=verbose,
+        )
+    finally:
+        if run_ctx is not None:
+            console.print(f"[cyan]Tearing down[/cyan] {run_ctx.resource_group} ...")
+            try:
+                teardown_run_resources(run_ctx, secrets)
+                console.print("[green]Teardown complete.[/green]")
+            except Exception as exc:
+                console.print(f"[red]Teardown failed:[/red] {exc}")
+                console.print(
+                    f"[yellow]Manual cleanup:[/yellow] "
+                    f"az group delete --name {run_ctx.resource_group} --yes"
+                )
 
     if dry_run or not clips:
         console.print("[dim]Dry run complete - no clips uploaded.[/dim]")

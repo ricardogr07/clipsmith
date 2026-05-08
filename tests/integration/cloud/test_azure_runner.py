@@ -72,12 +72,23 @@ def config() -> AppConfig:
     cfg.cloud = CloudConfig(
         resource_group="clipsmith-rg",
         location="eastus",
-        storage_account="testaccount",
         docker_image="ricardogr007/clipsmith:latest",
         aci_cpu=4.0,
         aci_memory_gb=16.0,
     )
     return cfg
+
+
+@pytest.fixture()
+def run_ctx():
+    from clipsmith.cloud.provisioner import RunContext
+
+    return RunContext(
+        resource_group="rg-clipsmith-ephemeral",
+        storage_account="clipsabcd1234",
+        storage_key="key==",
+        location="eastus",
+    )
 
 
 @pytest.fixture()
@@ -237,3 +248,26 @@ def test_run_vod_on_aci_dry_run(tmp_path: Path, config: AppConfig, secrets: Secr
 
     assert result == []
     mock_aci.assert_not_called()
+
+
+def test_create_container_group_with_run_ctx(config: AppConfig, secrets: Secrets, run_ctx) -> None:
+    """When run_ctx is provided, the container group is created in run_ctx.resource_group."""
+    mock_client = MagicMock()
+    mock_poller = MagicMock()
+    mock_client.container_groups.begin_create_or_update.return_value = mock_poller
+
+    with (
+        patch.dict(sys.modules, _azure_sys_modules()),
+        patch("clipsmith.cloud.azure_runner._aci_client", return_value=mock_client),
+    ):
+        from clipsmith.cloud.azure_runner import create_container_group
+
+        name = create_container_group("123456", config, secrets, run_ctx=run_ctx)
+
+    assert name == "clipsmith-123456"
+    call_args = mock_client.container_groups.begin_create_or_update.call_args
+    assert (
+        call_args.args[0] == "rg-clipsmith-ephemeral"
+    )  # from run_ctx, not config.cloud.resource_group
+    assert call_args.args[1] == "clipsmith-123456"
+    mock_poller.result.assert_called_once()

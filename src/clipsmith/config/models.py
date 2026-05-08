@@ -61,10 +61,10 @@ class ReframeConfig(BaseModel):
 
 
 class CloudConfig(BaseModel):
-    resource_group: str = "clipsmith-rg"
+    resource_group: str = (
+        "clipsmith-rg"  # used by `status` command; runs get their own ephemeral rg
+    )
     location: str = "eastus"
-    storage_account: str = ""
-    blob_container: str = "clipsmith-runs"
     aci_cpu: float = 4.0
     aci_memory_gb: float = 16.0
     docker_image: str = ""

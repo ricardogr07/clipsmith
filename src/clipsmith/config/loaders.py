@@ -31,6 +31,8 @@ class Secrets(BaseSettings):
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     azure_subscription_id: str = ""
+    # Legacy: only needed when running against manually pre-provisioned storage.
+    # Per-run provisioning (clipsmith cloud run) does not require these.
     azure_storage_account: str = ""
     azure_storage_key: str = ""
     docker_hub_username: str = ""

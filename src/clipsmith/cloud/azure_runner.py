@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from .provisioner import RunContext
+
 if TYPE_CHECKING:
     from ..settings import AppConfig, Secrets
 
@@ -27,21 +29,23 @@ def _aci_client(secrets: Secrets) -> Any:
     )
 
 
-def _share_client(secrets: Secrets, share_name: str) -> Any:
+def _share_client(secrets: Secrets, share_name: str, run_ctx: RunContext | None = None) -> Any:
     from azure.core.credentials import AzureNamedKeyCredential
     from azure.storage.fileshare import ShareClient
 
-    cred = AzureNamedKeyCredential(secrets.azure_storage_account, secrets.azure_storage_key)
+    acct = run_ctx.storage_account if run_ctx else secrets.azure_storage_account
+    key = run_ctx.storage_key if run_ctx else secrets.azure_storage_key
+    cred = AzureNamedKeyCredential(acct, key)
     return ShareClient(
-        account_url=f"https://{secrets.azure_storage_account}.file.core.windows.net",
+        account_url=f"https://{acct}.file.core.windows.net",
         share_name=share_name,
         credential=cred,
     )
 
 
-def upload_config(config_path: Path, secrets: Secrets) -> None:
+def upload_config(config_path: Path, secrets: Secrets, run_ctx: RunContext | None = None) -> None:
     """Upload config.yaml to the root of the work file share."""
-    share = _share_client(secrets, _WORK_SHARE)
+    share = _share_client(secrets, _WORK_SHARE, run_ctx)
     file_client = share.get_file_client("config.yaml")
     data = config_path.read_bytes()
     file_client.upload_file(data)
@@ -53,10 +57,12 @@ def create_container_group(
     config: AppConfig,
     secrets: Secrets,
     *,
+    run_ctx: RunContext | None = None,
     dry_run: bool = False,
 ) -> str:
     """Create the ACI container group. Returns the group name."""
     group_name = f"clipsmith-{vod_id}"
+    rg = run_ctx.resource_group if run_ctx else config.cloud.resource_group
 
     if dry_run:
         log.info(
@@ -78,6 +84,9 @@ def create_container_group(
         VolumeMount,
     )
 
+    acct = run_ctx.storage_account if run_ctx else secrets.azure_storage_account
+    key = run_ctx.storage_key if run_ctx else secrets.azure_storage_key
+
     env_vars = [
         EnvironmentVariable(name="ANTHROPIC_API_KEY", secure_value=secrets.anthropic_api_key),
         EnvironmentVariable(name="OPENAI_API_KEY", secure_value=secrets.openai_api_key),
@@ -90,16 +99,16 @@ def create_container_group(
             name="work",
             azure_file=AzureFileVolume(
                 share_name=_WORK_SHARE,
-                storage_account_name=secrets.azure_storage_account,
-                storage_account_key=secrets.azure_storage_key,
+                storage_account_name=acct,
+                storage_account_key=key,
             ),
         ),
         Volume(
             name="out",
             azure_file=AzureFileVolume(
                 share_name=_OUT_SHARE,
-                storage_account_name=secrets.azure_storage_account,
-                storage_account_key=secrets.azure_storage_key,
+                storage_account_name=acct,
+                storage_account_key=key,
             ),
         ),
     ]
@@ -146,10 +155,8 @@ def create_container_group(
     )
 
     client = _aci_client(secrets)
-    log.info("creating container group %s ...", group_name)
-    client.container_groups.begin_create_or_update(
-        config.cloud.resource_group, group_name, group
-    ).result()
+    log.info("creating container group %s in %s ...", group_name, rg)
+    client.container_groups.begin_create_or_update(rg, group_name, group).result()
     log.info("container group %s created", group_name)
     return group_name
 
@@ -159,22 +166,22 @@ def poll_until_done(
     config: AppConfig,
     secrets: Secrets,
     *,
+    run_ctx: RunContext | None = None,
     verbose: bool = False,
 ) -> str:
     """Poll ACI every 30s until the container group finishes. Returns terminal state string."""
+    rg = run_ctx.resource_group if run_ctx else config.cloud.resource_group
     client = _aci_client(secrets)
     last_log_len = 0
 
     while True:
-        grp = client.container_groups.get(config.cloud.resource_group, group_name)
+        grp = client.container_groups.get(rg, group_name)
         state = grp.instance_view.state if grp.instance_view else "Unknown"
         log.info("container group %s: %s", group_name, state)
 
         if verbose:
             try:
-                logs = client.containers.list_logs(
-                    config.cloud.resource_group, group_name, "clipsmith"
-                )
+                logs = client.containers.list_logs(rg, group_name, "clipsmith")
                 content = logs.content or ""
                 lines = content.splitlines()
                 new_lines = lines[last_log_len:]
@@ -190,9 +197,9 @@ def poll_until_done(
         time.sleep(_POLL_INTERVAL_S)
 
 
-def download_output(vod_id: str, secrets: Secrets) -> list[Path]:
+def download_output(vod_id: str, secrets: Secrets, run_ctx: RunContext | None = None) -> list[Path]:
     """Download out/<vod_id>/ from the file share into a temp dir. Returns list of local paths."""
-    share = _share_client(secrets, _OUT_SHARE)
+    share = _share_client(secrets, _OUT_SHARE, run_ctx)
     dir_client = share.get_directory_client(vod_id)
 
     vod_dir = Path(tempfile.mkdtemp()) / vod_id
@@ -212,17 +219,20 @@ def download_output(vod_id: str, secrets: Secrets) -> list[Path]:
     return clips
 
 
-def delete_container_group(group_name: str, config: AppConfig, secrets: Secrets) -> None:
+def delete_container_group(
+    group_name: str, config: AppConfig, secrets: Secrets, run_ctx: RunContext | None = None
+) -> None:
     """Delete the ACI container group (stops billing immediately)."""
+    rg = run_ctx.resource_group if run_ctx else config.cloud.resource_group
     client = _aci_client(secrets)
-    client.container_groups.begin_delete(config.cloud.resource_group, group_name).result()
+    client.container_groups.begin_delete(rg, group_name).result()
     log.info("deleted container group %s", group_name)
 
 
-def cleanup_file_share(vod_id: str, secrets: Secrets) -> None:
+def cleanup_file_share(vod_id: str, secrets: Secrets, run_ctx: RunContext | None = None) -> None:
     """Delete <vod_id>/ from both file shares. Errors are logged, not raised."""
     for share_name in (_WORK_SHARE, _OUT_SHARE):
-        share = _share_client(secrets, share_name)
+        share = _share_client(secrets, share_name, run_ctx)
         try:
             dir_client = share.get_directory_client(vod_id)
             for item in dir_client.list_directories_and_files():
@@ -240,6 +250,7 @@ def run_vod_on_aci(
     config: AppConfig,
     secrets: Secrets,
     *,
+    run_ctx: RunContext | None = None,
     dry_run: bool = False,
     verbose: bool = False,
 ) -> list[Path]:
@@ -247,21 +258,21 @@ def run_vod_on_aci(
 
     Returns list of downloaded clip paths (empty list on dry_run).
     """
-    upload_config(config_path, secrets)
-    group_name = create_container_group(vod_id, config, secrets, dry_run=dry_run)
+    upload_config(config_path, secrets, run_ctx)
+    group_name = create_container_group(vod_id, config, secrets, run_ctx=run_ctx, dry_run=dry_run)
 
     if dry_run:
         log.info("DRY RUN complete — no ACI resources created")
         return []
 
     try:
-        state = poll_until_done(group_name, config, secrets, verbose=verbose)
+        state = poll_until_done(group_name, config, secrets, run_ctx=run_ctx, verbose=verbose)
         if state != "Succeeded":
             raise RuntimeError(f"Container job finished with state '{state}' — check ACI logs")
-        return download_output(vod_id, secrets)
+        return download_output(vod_id, secrets, run_ctx)
     finally:
         try:
-            delete_container_group(group_name, config, secrets)
+            delete_container_group(group_name, config, secrets, run_ctx)
         except Exception as exc:
             log.warning("could not delete container group %s: %s", group_name, exc)
-        cleanup_file_share(vod_id, secrets)
+        cleanup_file_share(vod_id, secrets, run_ctx)
