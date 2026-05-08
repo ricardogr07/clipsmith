@@ -47,6 +47,20 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: python -m pytest tests/e2e/ --run-e2e -q
 
+  e2e-cloud:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    needs: lint
+    runs-on: ubuntu-latest
+    env:
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev,cloud]"
+      - run: python -m pytest tests/e2e/test_cloud.py --run-e2e -v
+
   security:
     runs-on: ubuntu-latest
     steps:

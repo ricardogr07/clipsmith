@@ -185,6 +185,41 @@ The container prints the same log output as a local `clipsmith run-vod -v` run.
 
 ---
 
+## Running the Cloud Smoke Tests
+
+Two end-to-end tests in `tests/e2e/test_cloud.py` provision real Azure resources, verify
+reachability, and tear everything down. They are skipped by default — both the `--run-e2e`
+flag and `AZURE_SUBSCRIPTION_ID` being set are required.
+
+**Local dev** (requires `az login` first):
+
+```powershell
+# Install cloud deps if not already installed
+pip install -e ".[dev,cloud]"
+
+# Run the two cloud smoke tests
+$env:AZURE_SUBSCRIPTION_ID = "<your-subscription-id>"
+python -m pytest tests/e2e/test_cloud.py --run-e2e -v
+```
+
+Expected output: 2 tests pass in roughly 3–6 minutes (storage account provisioning takes
+30–90 s per test).
+
+**CI** — the `e2e-cloud` job in `.github/workflows/ci.yml` runs on `workflow_dispatch` and
+nightly `schedule`. It needs `AZURE_SUBSCRIPTION_ID` set as a GitHub Actions repository
+secret. If the runner lacks ambient Azure credentials, also add `AZURE_CLIENT_ID`,
+`AZURE_TENANT_ID`, and `AZURE_CLIENT_SECRET` as secrets — `DefaultAzureCredential` picks
+them up automatically without any code change.
+
+**What the tests verify:**
+
+| Test | Checks |
+|---|---|
+| `test_cloud_provision_and_teardown` | Resource group and storage account are created with correct names; resource group is gone after teardown |
+| `test_cloud_file_share_roundtrip` | `clipsmith-work` share accepts a file upload and returns exact bytes on download; `clipsmith-out` share is reachable |
+
+---
+
 ## Prerequisites
 
 See [Azure Cloud Setup](dev/azure-cloud-setup.md) for the full one-time provisioning walkthrough covering:
