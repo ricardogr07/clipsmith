@@ -1,0 +1,19 @@
+name: E2E Cloud
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e-cloud:
+    runs-on: ubuntu-latest
+    env:
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_CLIENT_ID:        ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET:    ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_TENANT_ID:        ${{ secrets.AZURE_TENANT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev,cloud]"
+      - run: python -m pytest tests/e2e/test_cloud.py --run-e2e -v
