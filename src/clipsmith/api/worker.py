@@ -40,11 +40,19 @@ def start_run(run_id: int, vod_id: str, channel: str, provider: str | None) -> N
         db.close()
 
 
-def _emit(db: Session, run_id: int, stage: str, pct: float, message: str = "") -> None:
+def _emit(
+    db: Session,
+    run_id: int,
+    stage: str,
+    pct: float,
+    message: str = "",
+    *,
+    status: RunStatus = RunStatus.running,
+) -> None:
     run = db.get(Run, run_id)
     if run:
         run.stage = stage
-        run.status = RunStatus.running
+        run.status = status
         run.updated_at = datetime.now(timezone.utc)
     ev = PipelineEvent(run_id=run_id, stage=stage, pct=pct, message=message)
     db.add(ev)
@@ -79,13 +87,7 @@ def _run_pipeline(
     process_vod(video, cfg, secrets, on_stage=on_stage)
 
     _harvest_clips(db, run_id, vod_id, cfg)
-
-    run = db.get(Run, run_id)
-    if run:
-        run.status = RunStatus.done
-        run.stage = "done"
-        run.updated_at = datetime.now(timezone.utc)
-    _emit(db, run_id, "done", 100.0, "pipeline complete")
+    _emit(db, run_id, "done", 100.0, "pipeline complete", status=RunStatus.done)
 
 
 def _harvest_clips(db: Session, run_id: int, vod_id: str, cfg: AppConfig) -> None:
