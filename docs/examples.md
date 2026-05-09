@@ -2,7 +2,7 @@
 
 ## Google Colab Notebooks
 
-Four notebooks — pick the one that matches your setup:
+Five notebooks — pick the one that matches your setup:
 
 | Notebook | Runtime | LLM | Cost |
 |---|---|---|---|
@@ -10,6 +10,7 @@ Four notebooks — pick the one that matches your setup:
 | [02 — Local VOD](https://colab.research.google.com/github/ricardogr07/clipsmith/blob/main/examples/02_local_vod.ipynb) | CPU | Anthropic or OpenAI | API cost only |
 | [03 — Local VOD + Ollama](https://colab.research.google.com/github/ricardogr07/clipsmith/blob/main/examples/03_local_vod_ollama.ipynb) | T4 GPU | Ollama (free) | Free |
 | [04 — Cloud (Azure ACI)](https://colab.research.google.com/github/ricardogr07/clipsmith/blob/main/examples/04_cloud.ipynb) | CPU (Colab triggers Azure) | Anthropic | ~$0.30/VOD |
+| [05 — VOD + Ollama (Español)](https://colab.research.google.com/github/ricardogr07/clipsmith/blob/main/examples/05_vod_ollama_espa%C3%B1ol.ipynb) | T4 GPU | Ollama (free) | Free |
 
 ### 01 — Local MP4
 
@@ -34,6 +35,15 @@ Same as 02 but uses a T4 GPU for fast transcription and Ollama for free LLM infe
 - Requires **T4 GPU runtime** (Runtime → Change runtime type)
 - Transcription takes ~8–12 min for a 2-hr VOD (GPU `medium` model)
 - Ollama model (~4.7 GB) downloads once per session; optionally persisted to Drive
+
+### 05 — VOD + Ollama (Español)
+
+Versión en español del cuaderno 03, orientada a streamers hispanohablantes sin conocimientos técnicos.
+
+- Interfaz completamente en español con instrucciones paso a paso
+- Configuración centralizada: VOD ID, streamer, juego y fecha en una sola celda
+- Selección interactiva de clips antes de guardar en Drive
+- Guarda directamente en `Mi unidad → Streamer → Juego → Fecha`
 
 ### 04 — Cloud (Azure ACI)
 
