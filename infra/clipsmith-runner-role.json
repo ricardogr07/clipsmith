@@ -1,0 +1,23 @@
+{
+  "Name": "Clipsmith Runner",
+  "IsCustom": true,
+  "Description": "Least-privilege role for clipsmith cloud pipeline (resource groups, storage, ACI).",
+  "Actions": [
+    "Microsoft.Resources/subscriptions/resourcegroups/write",
+    "Microsoft.Resources/subscriptions/resourcegroups/read",
+    "Microsoft.Resources/subscriptions/resourcegroups/delete",
+    "Microsoft.Storage/storageAccounts/write",
+    "Microsoft.Storage/storageAccounts/read",
+    "Microsoft.Storage/storageAccounts/delete",
+    "Microsoft.Storage/storageAccounts/listKeys/action",
+    "Microsoft.Storage/storageAccounts/fileServices/shares/write",
+    "Microsoft.Storage/storageAccounts/fileServices/shares/read",
+    "Microsoft.ContainerInstance/containerGroups/write",
+    "Microsoft.ContainerInstance/containerGroups/read",
+    "Microsoft.ContainerInstance/containerGroups/delete",
+    "Microsoft.ContainerInstance/containerGroups/containers/logs/read",
+    "Microsoft.ContainerInstance/operations/read"
+  ],
+  "NotActions": [],
+  "AssignableScopes": ["/subscriptions/SUBSCRIPTION_ID_PLACEHOLDER"]
+}

@@ -158,13 +158,13 @@ Provision an Azure Container Instance, run the pipeline in Docker, upload clips 
 
 ### `clipsmith cloud setup`
 
-Verify that the Azure storage account and file shares are reachable.
+Validate Azure credentials.
 
 ```sh
 clipsmith cloud setup [--config config.yaml]
 ```
 
-Checks that `clipsmith-work` and `clipsmith-out` file shares exist and that credentials in `.env` are valid. Run this once after initial Azure provisioning.
+Confirms that `DefaultAzureCredential` resolves successfully (via Service Principal env vars or `az login`). Storage accounts and file shares are provisioned automatically per run — no manual setup or storage verification is needed.
 
 ---
 

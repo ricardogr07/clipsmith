@@ -15,7 +15,7 @@ pip install -e ".[vision]"   # optional — for detect-webcam and OpenCV tests
 pytest tests/ -q
 ```
 
-The test suite has 115 tests and runs in ~2 s. Core pipeline logic has >96% coverage.
+The test suite has 142+ tests and runs in ~2 s. Core pipeline logic has >96% coverage.
 No external services are called — all LLM and Twitch API calls are mocked.
 
 ## Type checking
@@ -47,12 +47,15 @@ in the installed environment.
 
 ## CI
 
-GitHub Actions runs on every push and PR (`.github/workflows/ci.yml`):
+Three separate workflow files in `.github/workflows/`:
 
-| Job | Steps |
-|-----|-------|
-| `ci` | ruff → mypy → pytest |
-| `security` | bandit → pip-audit |
+| Workflow | Trigger | Jobs |
+|---|---|---|
+| `ci.yml` | every push / PR / manual | `lint` (ruff + mypy), `tests` (pytest), `security` (bandit + pip-audit) |
+| `e2e.yml` | manual (`workflow_dispatch`) only | Twitch + Anthropic end-to-end pipeline |
+| `e2e-cloud.yml` | manual (`workflow_dispatch`) only | Azure provisioning smoke tests |
+
+E2E workflows are not triggered automatically — run them manually before a release.
 
 ## Docs
 
@@ -68,36 +71,59 @@ Doc source lives in `docs/`. The site config is `mkdocs.yml` at the repo root.
 
 ```
 src/clipsmith/
-├── cli.py              Entry point — registers commands from cli_run/clip/setup
-├── cli_run.py          process, watch, run-vod, whoami
-├── cli_clip.py         clip, reframe
-├── cli_setup.py        setup, check-ollama, detect-webcam
-├── cli_utils.py        _resolve_config, _parse_start_at
-├── pipeline.py         Orchestrator — calls stages 1-6
-├── downloader.py       twitch-dl wrapper
-├── detect.py           OpenCV Haar cascade webcam detection
-├── transcribe.py       faster-whisper wrapper
-├── chat.py             Twitch GQL chat replay
-├── candidates.py       Signal merging and scoring
-├── candidates_math.py  Sliding-window density + peak detection
-├── audio_signal.py     ffmpeg RMS energy extraction
-├── selector.py         LLM loop → PickResult list
+├── cli/
+│   ├── __init__.py     Typer app assembly — registers all command groups
+│   ├── run.py          process, watch, run-vod, whoami
+│   ├── clip.py         clip, reframe
+│   ├── setup.py        setup, check-ollama, detect-webcam
+│   ├── cloud.py        cloud setup|build|run|drive-auth|status
+│   └── utils.py        _resolve_config, _parse_start_at
+├── cloud/
+│   ├── azure_runner.py ACI container lifecycle + file share I/O
+│   ├── drive_upload.py Google Drive OAuth2 upload
+│   └── provisioner.py  Ephemeral resource group + storage account per run
+├── config/
+│   ├── models.py       AppConfig, CloudConfig, ClipConfig, … (Pydantic)
+│   └── loaders.py      load_config(), load_secrets(), Secrets
+├── twitch/
+│   ├── client.py       Twitch API (user ID lookup, existing clips)
+│   ├── downloader.py   twitch-dl wrapper
+│   ├── chat.py         GQL chat replay download
+│   ├── state.py        Persists seen VOD IDs
+│   └── watcher.py      Poll daemon
+├── transcription/
+│   └── transcriber.py  faster-whisper wrapper (chunked parallel)
+├── candidates/
+│   ├── builder.py      Signal merging and scoring
+│   ├── math.py         Sliding-window density + peak detection
+│   └── audio.py        ffmpeg RMS energy extraction
+├── selection/
+│   └── selector.py     LLM loop → PickResult list
+├── rendering/
+│   ├── clipper.py      ffmpeg clip cutting + ASS caption burn-in
+│   ├── captions.py     Transcript → ASS subtitle file
+│   └── detect.py       OpenCV Haar cascade webcam detection
 ├── llm/
 │   ├── base.py         ClipPicker Protocol, ClipPick dataclass
+│   ├── prompts.py      System prompt + candidate prompt builders
 │   ├── anthropic_provider.py
 │   ├── openai_provider.py
 │   └── ollama_provider.py
-├── clipper.py          ffmpeg clip cutting + ASS caption burn-in
-├── captions.py         Transcript → ASS subtitle file
-├── settings.py         AppConfig (YAML) + Secrets (.env)
-├── state.py            Persists seen VOD IDs
-└── watcher.py          Twitch poll daemon
+├── models/
+│   ├── transcript.py   Transcript, Segment dataclasses
+│   ├── chat.py         ChatLog dataclass
+│   ├── candidates.py   Candidate dataclass
+│   └── twitch.py       TwitchClip dataclass
+├── io/
+│   └── media.py        Video metadata helpers
+├── pipeline.py         Orchestrator — calls stages 1-6
+└── settings.py         Re-export shim for AppConfig + Secrets
 ```
 
 ## Adding a new LLM provider
 
 1. Create `src/clipsmith/llm/<name>_provider.py` implementing the `ClipPicker` Protocol
    from `src/clipsmith/llm/base.py`.
-2. Add a branch in `src/clipsmith/selector.py` where providers are instantiated.
-3. Add the provider name to the `--provider` help strings in `cli_run.py` and `cli_setup.py`.
+2. Add a branch in `src/clipsmith/selection/selector.py` where providers are instantiated.
+3. Add the provider name to the `--provider` help strings in `src/clipsmith/cli/run.py` and `src/clipsmith/cli/setup.py`.
 4. Write tests in `tests/test_selector.py` mocking the new provider.

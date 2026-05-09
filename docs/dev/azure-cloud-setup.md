@@ -38,52 +38,13 @@ Add to `.env`:
 AZURE_SUBSCRIPTION_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
 
----
-
-## 3. Resource Group
-
-```powershell
-az group create --name clipsmith-rg --location eastus
-```
-
-> To delete all cloud resources at once: `az group delete --name clipsmith-rg`
+> **Storage is automatic.** `clipsmith cloud run` provisions a fresh resource group,
+> storage account, and file shares on every run, then deletes them all on completion.
+> No manual storage setup is needed.
 
 ---
 
-## 4. Storage Account & File Shares
-
-ACI containers mount Azure File Shares for the `work/` and `out/` directories.
-The container accesses them as ordinary filesystem paths — no Azure SDK required inside the container.
-
-```powershell
-$STORAGE="clipsmithstorage<yourname>"   # globally unique, 3-24 lowercase alphanumeric
-
-az storage account create `
-  --name $STORAGE `
-  --resource-group clipsmith-rg `
-  --location eastus `
-  --sku Standard_LRS `
-  --kind StorageV2
-
-az storage share create --name clipsmith-work --account-name $STORAGE --quota 50
-az storage share create --name clipsmith-out  --account-name $STORAGE --quota 20
-
-# Copy this value into .env as AZURE_STORAGE_KEY
-az storage account keys list `
-  --account-name $STORAGE `
-  --resource-group clipsmith-rg `
-  --query "[0].value" -o tsv
-```
-
-Add to `.env`:
-```env
-AZURE_STORAGE_ACCOUNT=clipsmithstorage<yourname>
-AZURE_STORAGE_KEY=<key from above>
-```
-
----
-
-## 5. ACI Provider Registration
+## 3. ACI Provider Registration
 
 Only needed the first time you use ACI on this subscription:
 
@@ -95,7 +56,7 @@ az provider show --namespace Microsoft.ContainerInstance --query "registrationSt
 
 ---
 
-## 6. GPU Quota (Optional — skip for CPU-only)
+## 4. GPU Quota (Optional — skip for CPU-only)
 
 CPU (`int8` Whisper small/medium) costs ~$0.28/run for a 2-hr VOD.
 GPU (V100) is ~10× faster but ~$1.80/run — worthwhile only if you process many long VODs per day.
@@ -118,7 +79,7 @@ Available GPU SKUs for ACI (set in `config.yaml` as `cloud.gpu_sku`):
 
 ---
 
-## 7. Docker Hub
+## 5. Docker Hub
 
 1. Create an account at https://hub.docker.com
 2. Create a repository: `hub.docker.com/r/<youruser>/clipsmith`
@@ -142,21 +103,21 @@ cloud:
 
 ---
 
-## 8. Google Drive — OAuth2 Setup
+## 6. Google Drive — OAuth2 Setup
 
 clipsmith uses **OAuth2 user credentials** (not a service account) because Google service accounts have no storage quota on personal Google Drive — any file they upload causes a `storageQuotaExceeded` error. OAuth2 files are owned by your real Google account and count against your 15 GB quota.
 
-### 8a. Create a Google Cloud project
+### 6a. Create a Google Cloud project
 
 1. Go to https://console.cloud.google.com/
 2. Click the project dropdown → **New Project** → name: `clipsmith` → **Create**
 
-### 8b. Enable the Drive API
+### 6b. Enable the Drive API
 
 1. Navigation menu → **APIs & Services** → **Library**
 2. Search "Google Drive API" → **Enable**
 
-### 8c. Configure the OAuth consent screen
+### 6c. Configure the OAuth consent screen
 
 1. **APIs & Services** → **OAuth consent screen**
 2. User type: **External** → **Create**
@@ -166,7 +127,7 @@ clipsmith uses **OAuth2 user credentials** (not a service account) because Googl
 
 > You must add yourself as a test user while the app is in "Testing" status. Without this, the OAuth flow will show "Access blocked: clip-smith has not completed the Google verification process".
 
-### 8d. Create an OAuth2 Desktop app client
+### 6d. Create an OAuth2 Desktop app client
 
 1. **APIs & Services** → **Credentials** → **Create Credentials** → **OAuth 2.0 Client ID**
 2. Application type: **Desktop app** → name: `clipsmith-local` → **Create**
@@ -174,7 +135,7 @@ clipsmith uses **OAuth2 user credentials** (not a service account) because Googl
 
 `google_oauth_client.json` is already covered by `.gitignore`. Do not commit it.
 
-### 8e. Create your Drive folder
+### 6e. Create your Drive folder
 
 1. Open Google Drive → create a folder (e.g. `chuyelwero`)
 2. Note the **folder ID** from the URL: `https://drive.google.com/drive/folders/<FOLDER_ID>`
@@ -185,7 +146,7 @@ GOOGLE_OAUTH_CLIENT_JSON=C:\git\clipsmith\google_oauth_client.json
 GOOGLE_DRIVE_FOLDER_ID=<folder-id-from-url>
 ```
 
-### 8f. Authorize (one-time browser login)
+### 6f. Authorize (one-time browser login)
 
 ```powershell
 clipsmith cloud drive-auth
@@ -195,29 +156,30 @@ This opens a browser. Log in with your Google account → grant access → the t
 
 ---
 
-## 9. `config.yaml` Cloud Section
+## 7. `config.yaml` Cloud Section
 
 ```yaml
 cloud:
-  resource_group: clipsmith-rg
   location: eastus
-  storage_account: clipsmithstorage<yourname>
   aci_cpu: 4.0
   aci_memory_gb: 16.0
   docker_image: "<yourdockerhubuser>/clipsmith:latest"
-  gpu_sku: ""           # uncomment and set to V100 etc. for GPU (requires Step 6)
+  gpu_sku: ""           # uncomment and set to V100 etc. for GPU (requires Step 4)
 ```
+
+The `resource_group` and `storage_account` fields are no longer required — resources are
+provisioned automatically per run and torn down on completion.
 
 ---
 
-## 10. Build and Verify
+## 8. Build and Verify
 
 ```powershell
 # Build the Docker image and push to Docker Hub
 # First build is ~10 min (Whisper model gets baked in)
 clipsmith cloud build
 
-# Verify Azure credentials and file shares are reachable
+# Verify Azure credentials are valid
 clipsmith cloud setup
 
 # Dry-run: print the ACI spec without provisioning anything

@@ -19,8 +19,12 @@ OPENAI_API_KEY=...
 
 # Azure credentials (cloud mode only)
 AZURE_SUBSCRIPTION_ID=...
-AZURE_STORAGE_ACCOUNT=...
-AZURE_STORAGE_KEY=...
+
+# Azure Service Principal — optional but recommended (see docs/cloud.md)
+# Without these, DefaultAzureCredential falls back to `az login`
+AZURE_CLIENT_ID=...
+AZURE_CLIENT_SECRET=...
+AZURE_TENANT_ID=...
 
 # Docker Hub credentials (cloud mode — prevents ACI rate-limit errors)
 DOCKER_HUB_USERNAME=...
@@ -74,9 +78,12 @@ llm:
 clip:
   min_seconds: 15
   max_seconds: 30
+  preroll_s: 25       # seconds before the candidate timestamp to start the clip
+  postroll_s: 10      # seconds after the candidate timestamp to end the clip
+  min_clip_gap_s: 120 # minimum seconds between any two LLM-selected clips
 ```
 
-The LLM is instructed to keep clips within this window. ffmpeg trims to these bounds.
+The LLM is instructed to keep clips within `min_seconds`/`max_seconds`. `preroll_s` and `postroll_s` define how much context around each candidate is included before LLM trimming. `min_clip_gap_s` prevents two clips from being too close together.
 
 ---
 
@@ -136,7 +143,7 @@ transcribe:
   compute_type: int8
   chunk_minutes: 10         # 0 = no chunking
   chunk_overlap_s: 30
-  max_workers: 2
+  max_workers: 4
 ```
 
 | Key | Description |
@@ -154,8 +161,16 @@ transcribe:
 
 ```yaml
 candidates:
-  max_candidates: 20        # top-N sent to the LLM
-  merge_window_s: 60        # candidates within this window are merged
+  density_window_s: 15               # sliding window for chat density peaks
+  density_peak_multiplier: 4.0       # chat density must exceed baseline × this to score
+  existing_clip_boost: 100.0         # score added per existing Twitch clip at this timestamp
+  clip_command_boost: 25.0           # score added per !clip chat command
+  dedupe_window_s: 60                # candidates within this window are merged (highest score wins)
+  transcript_hype_score: 12.0        # score added per hype keyword hit in transcript
+  audio_energy_enabled: true
+  audio_energy_window_s: 2.0         # RMS peak detection window
+  audio_energy_peak_multiplier: 2.0  # RMS must exceed baseline × this to score
+  audio_energy_boost: 15.0           # score added per audio energy peak
 ```
 
 ---
@@ -172,9 +187,8 @@ poll_interval_s: 120   # seconds between Twitch polls in watch mode
 
 ```yaml
 cloud:
-  resource_group: clipsmith-rg
+  resource_group: clipsmith-rg   # used only by `clipsmith cloud status`
   location: eastus
-  storage_account: <your-storage-account>
   aci_cpu: 4.0
   aci_memory_gb: 16.0
   docker_image: "<yourdockerhubuser>/clipsmith:latest"
@@ -183,12 +197,11 @@ cloud:
 
 | Key | Description |
 |-----|-------------|
-| `resource_group` | Azure resource group containing ACI and storage |
-| `location` | Azure region (e.g. `eastus`, `westus2`) |
-| `storage_account` | Storage account name (must match `AZURE_STORAGE_ACCOUNT` in `.env`) |
+| `resource_group` | Resource group prefix used by `clipsmith cloud status` to list running jobs. Actual run resource groups are ephemeral and unique per run. |
+| `location` | Azure region for ephemeral resources (e.g. `eastus`, `westus2`) |
 | `aci_cpu` | vCPU count for the container (4.0 handles a 2-hr VOD in ~60 min) |
 | `aci_memory_gb` | RAM for the container in GB |
 | `docker_image` | Full Docker Hub image tag (built by `clipsmith cloud build`) |
 | `gpu_sku` | Optional NVIDIA GPU model — requires quota increase from Azure |
 
-The `cloud` section is only used by `clipsmith cloud` commands. Local `run-vod` and `process` commands ignore it.
+Storage accounts and file shares are provisioned automatically per run and torn down on completion. No manual storage setup is required. The `cloud` section is only used by `clipsmith cloud` commands — local `run-vod` and `process` ignore it.

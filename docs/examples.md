@@ -1,17 +1,48 @@
 # Examples
 
-## Google Colab notebook
+## Google Colab Notebooks
 
-Run clipsmith entirely in the cloud — no local GPU or ffmpeg install required.
+Four notebooks — pick the one that matches your setup:
 
-[**Open in Colab →**](https://colab.research.google.com/github/ricardogr07/clipsmith/blob/main/examples/clipsmith_colab.ipynb){ .md-button }
+| Notebook | Runtime | LLM | Cost |
+|---|---|---|---|
+| [01 — Local MP4](https://colab.research.google.com/github/ricardogr07/clipsmith/blob/main/examples/01_local_mp4.ipynb) | CPU | Anthropic or OpenAI | API cost only |
+| [02 — Local VOD](https://colab.research.google.com/github/ricardogr07/clipsmith/blob/main/examples/02_local_vod.ipynb) | CPU | Anthropic or OpenAI | API cost only |
+| [03 — Local VOD + Ollama](https://colab.research.google.com/github/ricardogr07/clipsmith/blob/main/examples/03_local_vod_ollama.ipynb) | T4 GPU | Ollama (free) | Free |
+| [04 — Cloud (Azure ACI)](https://colab.research.google.com/github/ricardogr07/clipsmith/blob/main/examples/04_cloud.ipynb) | CPU (Colab triggers Azure) | Anthropic | ~$0.30/VOD |
 
-The notebook covers:
+### 01 — Local MP4
 
-- Installing clipsmith and dependencies in a Colab runtime
-- Configuring Anthropic or OpenAI as the LLM provider
-- Downloading and processing a Twitch VOD
-- Downloading the output clips
+Upload a recording you already have. No Twitch credentials needed.
+
+- Upload your MP4 directly in the notebook
+- Transcribes and selects clips using Anthropic or OpenAI
+- Downloads finished clips back to your computer
+
+### 02 — Local VOD
+
+Download a Twitch VOD and process it end-to-end on Colab's CPU.
+
+- Requires a Twitch VOD ID
+- Transcription takes ~25–40 min for a 2-hr VOD (CPU `small` model)
+- Uses Anthropic or OpenAI for clip selection
+
+### 03 — Local VOD + Ollama (free)
+
+Same as 02 but uses a T4 GPU for fast transcription and Ollama for free LLM inference — no API key or cost.
+
+- Requires **T4 GPU runtime** (Runtime → Change runtime type)
+- Transcription takes ~8–12 min for a 2-hr VOD (GPU `medium` model)
+- Ollama model (~4.7 GB) downloads once per session; optionally persisted to Drive
+
+### 04 — Cloud (Azure ACI)
+
+Trigger a full Azure cloud run from Colab. Colab just orchestrates — all compute happens in Azure.
+
+- Requires Azure credentials, Docker Hub image already pushed (`clipsmith cloud build`)
+- ACI container runs the full pipeline (~60 min for a 2-hr VOD)
+- Clips are uploaded automatically to Google Drive; Azure resources deleted on completion
+- Cost: ~$0.30 per 2-hr VOD
 
 ---
 

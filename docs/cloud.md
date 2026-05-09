@@ -152,11 +152,20 @@ The azure-storage-file-share SDK (≥ 12.18) removed `StorageSharedKeyCredential
 
 ## Monitoring a Running Job
 
-While `clipsmith cloud run` is polling, you can tail the container logs from another terminal:
+Each run creates an ephemeral resource group named `rg-clipsmith-<vod_id_prefix>-<unix_ts>`.
+The `clipsmith cloud run` output prints the exact name when provisioning completes — copy it
+from there. You can also list all active jobs:
+
+```powershell
+clipsmith cloud status
+```
+
+To tail container logs from another terminal, substitute the resource group and container group
+names from the run output:
 
 ```powershell
 az container logs `
-  --resource-group clipsmith-rg `
+  --resource-group rg-clipsmith-<vod_id_prefix>-<unix_ts> `
   --name clipsmith-<vod_id> `
   --container-name clipsmith `
   --follow
@@ -228,3 +237,58 @@ See [Azure Cloud Setup](dev/azure-cloud-setup.md) for the full one-time provisio
 - Storage account and file share provisioning
 - Docker Hub repository and access token
 - Google Cloud project, Drive API, and OAuth2 Desktop app credentials
+
+---
+
+## Service Principal (Recommended)
+
+> **TODO:** SP creation requires Global Admin rights on the Azure AD tenant. If your subscription
+> is linked to an organization tenant (e.g. a university or company), IT policy may block app
+> registration. In that case, use `az login` as the fallback — `DefaultAzureCredential` picks it
+> up automatically and everything works. Revisit this section if you migrate to a personal
+> subscription (your own `@outlook.com`/`@hotmail.com` tenant), where you are the Global Admin.
+> The role definition is already committed at `infra/clipsmith-runner-role.json` — setup is a
+> two-command operation once you have a tenant you control.
+
+By default `DefaultAzureCredential` falls back to `az login`, meaning clipsmith runs as your
+personal admin account. It is better to use a dedicated Service Principal with a least-privilege
+custom role so clipsmith can only do what it needs to do.
+
+**One-time setup (requires Global Admin on the Azure AD tenant):**
+
+```powershell
+$sub = $env:AZURE_SUBSCRIPTION_ID
+
+# 1. Create the custom role from the committed definition
+(Get-Content infra/clipsmith-runner-role.json) `
+  -replace 'SUBSCRIPTION_ID_PLACEHOLDER', $sub |
+  az role definition create --role-definition '@-'
+
+# 2. Create the service principal and assign the custom role
+az ad sp create-for-rbac `
+  --name "clipsmith-runner" `
+  --role "Clipsmith Runner" `
+  --scopes /subscriptions/$sub `
+  --json-auth
+```
+
+The `--json-auth` flag prints a JSON block. Copy the values into `.env`:
+
+```dotenv
+AZURE_CLIENT_ID=<clientId>
+AZURE_CLIENT_SECRET=<password>
+AZURE_TENANT_ID=<tenant>
+```
+
+`DefaultAzureCredential` picks up these env vars automatically as its first credential source —
+no `az login` needed for clipsmith after this point. The role (`infra/clipsmith-runner-role.json`)
+grants only the permissions clipsmith actually uses across Resource Groups, Storage, and ACI.
+
+**Verify:**
+
+```powershell
+clipsmith cloud setup   # should print "Azure credentials valid" — as clipsmith-runner, not you
+```
+
+After a cloud run, Azure Portal → Monitor → Activity Log will show `clipsmith-runner` as the
+initiating identity instead of your personal email.
