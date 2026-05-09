@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Callable
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -57,6 +58,7 @@ def process_vod(
     provider: str | None = None,
     max_candidates: int = 20,
     start_s: float = 0.0,
+    on_stage: Callable[[str, float], None] | None = None,
 ) -> None:
     """Run the full pipeline for one VOD: download → transcribe → candidates → select → clip."""
     video_id = video.id
@@ -76,6 +78,8 @@ def process_vod(
         f"({video.duration}, type={video.type}) — {len(existing_clips)} existing clip(s)"
     )
 
+    if on_stage:
+        on_stage("download", 5.0)
     if not skip_download:
         console.print("[cyan]downloading...[/cyan]")
         result = download_vod(video_id, work_dir)
@@ -90,6 +94,8 @@ def process_vod(
     if start_s > 0:
         console.print(f"[dim]start offset:[/dim] {start_s:.0f}s — pregame content will be skipped")
 
+    if on_stage:
+        on_stage("transcribe", 15.0)
     console.print(f"[cyan]transcribing[/cyan] {mp4_path.name} ...")
     transcript = transcribe(
         mp4_path,
@@ -111,6 +117,8 @@ def process_vod(
         f"language={transcript.language}"
     )
 
+    if on_stage:
+        on_stage("chat", 40.0)
     console.print("[cyan]downloading chat...[/cyan]")
     chat = download_chat(video_id, work_dir, overwrite=not skip_chat)
     if start_s > 0:
@@ -121,6 +129,8 @@ def process_vod(
         )
     console.print(f"[green]chat loaded[/green]: {len(chat.messages)} messages")
 
+    if on_stage:
+        on_stage("candidates", 50.0)
     console.print("[cyan]scoring candidates...[/cyan]")
     candidates = build_candidates(
         chat, existing_clips, cfg.candidates, transcript=transcript, mp4_path=mp4_path
@@ -156,6 +166,8 @@ def process_vod(
     if provider:
         cfg.llm.provider = provider  # type: ignore[assignment]
 
+    if on_stage:
+        on_stage("select", 60.0)
     console.print(
         f"[cyan]selecting clips[/cyan] via {cfg.llm.provider} (top {max_candidates} candidates)..."
     )
@@ -186,6 +198,8 @@ def process_vod(
         console.print("[yellow]clipping skipped (--skip-clip)[/yellow]")
         return
 
+    if on_stage:
+        on_stage("clip", 85.0)
     out_dir = cfg.out_dir.expanduser() / video_id
     console.print(f"[cyan]cutting clips[/cyan] -> {out_dir}")
     clip_paths = cut_all_clips(mp4_path, transcript, picks, out_dir, cfg)

@@ -49,6 +49,11 @@ dev = [
     "mkdocs>=1.6",
     "mkdocs-material>=9.5",
 ]
+server = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+]
 vision = [
     "opencv-python-headless>=4.9",
 ]
