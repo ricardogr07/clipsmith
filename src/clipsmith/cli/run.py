@@ -240,6 +240,22 @@ def run_vod(
         raise typer.Exit(1)
 
 
+def serve(
+    host: str = typer.Option("0.0.0.0", "--host", help="Bind host"),  # nosec B104
+    port: int = typer.Option(8000, "--port", help="Bind port"),
+    reload: bool = typer.Option(False, "--reload", help="Auto-reload on code changes (dev only)"),
+) -> None:
+    """Start the clipsmith REST API server (requires [server] extra)."""
+    try:
+        import uvicorn
+    except ImportError:
+        console.print("[red]uvicorn not installed.[/red] Run: pip install 'clipsmith-ai[server]'")
+        raise typer.Exit(1)
+
+    console.print(f"[green]clipsmith API[/green] → http://{host}:{port}/docs")
+    uvicorn.run("clipsmith.api.app:app", host=host, port=port, reload=reload)
+
+
 def whoami(
     login: str = typer.Argument(..., help="Twitch login to resolve"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
