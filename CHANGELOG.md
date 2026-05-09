@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/ricardogr07/clipsmith/compare/v0.2.0...v0.2.1) (2026-05-09)
+
+
+### Bug Fixes
+
+* use pip install clipsmith-ai in all Colab notebooks ([#3](https://github.com/ricardogr07/clipsmith/issues/3)) ([6eedef5](https://github.com/ricardogr07/clipsmith/commit/6eedef5d7ed4724741d969ebf1b882e3718be489))
+
 ## [0.2.0](https://github.com/ricardogr07/clipsmith/compare/v0.1.0...v0.2.0) (2026-05-09)
 
 
