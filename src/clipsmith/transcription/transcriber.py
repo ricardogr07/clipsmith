@@ -18,6 +18,17 @@ log = logging.getLogger(__name__)
 __all__ = ["Word", "Segment", "Transcript", "transcribe"]
 
 
+def _detect_device() -> str:
+    try:
+        import ctranslate2  # type: ignore[import-untyped]
+
+        if ctranslate2.get_cuda_device_count() > 0:
+            return "cuda"
+    except Exception:
+        pass
+    return "cpu"
+
+
 def _extract_audio_chunk(mp4: Path, start_s: float, duration_s: float, out_wav: Path) -> None:
     """Extract a mono 16kHz WAV slice from mp4 using ffmpeg."""
     cmd = [
@@ -135,7 +146,9 @@ def _chunked_transcribe(
         config.model,
         config.compute_type,
     )
-    model = WhisperModel(config.model, device="cpu", compute_type=config.compute_type)
+    device = _detect_device()
+    log.info("transcription device: %s", device)
+    model = WhisperModel(config.model, device=device, compute_type=config.compute_type)
 
     with tempfile.TemporaryDirectory() as tmp:
         wav_paths: list[Path] = []
@@ -200,7 +213,9 @@ def transcribe(
         config.model,
         config.compute_type,
     )
-    model = WhisperModel(config.model, device="cpu", compute_type=config.compute_type)
+    device = _detect_device()
+    log.info("transcription device: %s", device)
+    model = WhisperModel(config.model, device=device, compute_type=config.compute_type)
 
     log.info("transcribing %s (language=%s) ...", mp4_path.name, config.language)
     raw_segments, info = model.transcribe(
