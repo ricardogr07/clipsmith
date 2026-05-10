@@ -40,6 +40,7 @@ class Secrets(BaseSettings):
     google_service_account_json: str = ""
     google_oauth_client_json: str = ""
     google_drive_folder_id: str = ""
+    clipsmith_api_key: str = ""
 
 
 def load_config(path: str | Path = "config.yaml") -> AppConfig:

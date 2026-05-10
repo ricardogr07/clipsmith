@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..deps import get_db
+from ..deps import get_db, verify_api_key
 from ..worker import start_run
 from ...db.models import Run, RunStatus
 
@@ -19,7 +19,7 @@ class RunCreate(BaseModel):
     provider: str | None = None
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, dependencies=[Depends(verify_api_key)])
 def create_run(
     body: RunCreate,
     background_tasks: BackgroundTasks,
