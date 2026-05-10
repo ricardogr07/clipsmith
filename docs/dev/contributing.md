@@ -7,7 +7,20 @@ git clone https://github.com/ricardogr07/clipsmith
 cd clipsmith
 pip install -e ".[dev]"
 pip install -e ".[vision]"   # optional — for detect-webcam and OpenCV tests
+pip install -e ".[server]"   # optional — for REST API server (FastAPI + uvicorn)
 ```
+
+## Run the API server
+
+```sh
+pip install -e ".[server]"
+clipsmith serve
+# → http://localhost:8000/docs
+```
+
+Set `api_key` in `config.yaml` (or env var `CLIPSMITH_API_KEY`) to require an
+`X-Api-Key` header on mutating endpoints. Leave it `null` to disable auth
+(default for local dev).
 
 ## Run tests
 
@@ -71,6 +84,21 @@ Doc source lives in `docs/`. The site config is `mkdocs.yml` at the repo root.
 
 ```
 src/clipsmith/
+├── api/
+│   ├── __init__.py
+│   ├── app.py             FastAPI app factory — CORS, lifespan, router assembly
+│   ├── deps.py            get_db(), verify_api_key() shared dependencies
+│   ├── worker.py          Background thread: runs process_vod, emits SSE events
+│   └── routes/
+│       ├── runs.py        POST/GET /runs, GET /runs/{id}
+│       ├── clips.py       GET /runs/{id}/clips, PATCH /clips/{id}
+│       ├── stream.py      GET /runs/{id}/progress  (SSE)
+│       ├── files.py       GET /clips/file/{filename}
+│       └── health.py      GET /health, GET /metrics
+├── db/
+│   ├── __init__.py
+│   ├── models.py          SQLAlchemy ORM: Run, Clip, PipelineEvent
+│   └── session.py         Engine init, get_session(), init_db()
 ├── cli/
 │   ├── __init__.py     Typer app assembly — registers all command groups
 │   ├── run.py          process, watch, run-vod, whoami

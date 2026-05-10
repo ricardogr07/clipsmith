@@ -1,0 +1,181 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    // ── Dev servers (background — not tox) ────────────────────────────────
+    {
+      "label": "Next.js: dev",
+      "type": "shell",
+      "command": "pnpm dev",
+      "options": { "cwd": "${workspaceFolder}/web" },
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": {
+        "owner": "nextjs",
+        "pattern": [{ "regexp": "^(.*)$", "message": 1 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Next\\.js",
+          "endsPattern": "- Local:"
+        }
+      }
+    },
+    {
+      "label": "Next.js: dev + open browser",
+      "dependsOn": ["Next.js: dev"],
+      "dependsOrder": "sequence",
+      "type": "shell",
+      "command": "Start-Process 'http://localhost:3000'",
+      "presentation": { "reveal": "silent", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "FastAPI: serve",
+      "type": "shell",
+      "command": "clipsmith serve",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": {
+        "owner": "fastapi",
+        "pattern": [{ "regexp": "^(.*)$", "message": 1 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Started|Application startup",
+          "endsPattern": "Uvicorn running|Application startup complete"
+        }
+      }
+    },
+    {
+      "label": "FastAPI: serve (reload)",
+      "type": "shell",
+      "command": "clipsmith serve --reload",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": {
+        "owner": "fastapi",
+        "pattern": [{ "regexp": "^(.*)$", "message": 1 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Started|Application startup",
+          "endsPattern": "Uvicorn running|Application startup complete"
+        }
+      }
+    },
+    {
+      "label": "Storybook: dev",
+      "type": "shell",
+      "command": "pnpm storybook",
+      "options": { "cwd": "${workspaceFolder}/web" },
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": {
+        "owner": "storybook",
+        "pattern": [{ "regexp": "^(.*)$", "message": 1 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "storybook",
+          "endsPattern": "Local:"
+        }
+      }
+    },
+    {
+      "label": "Cypress: open",
+      "type": "shell",
+      "command": "pnpm cy:open",
+      "options": { "cwd": "${workspaceFolder}/web" },
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    // ── Backend validation (tox) ───────────────────────────────────────────
+    {
+      "label": "Backend: lint",
+      "type": "shell",
+      "command": "tox -e lint",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: type-check",
+      "type": "shell",
+      "command": "tox -e type",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: test",
+      "type": "shell",
+      "command": "tox -e test",
+      "group": { "kind": "test", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: test api",
+      "type": "shell",
+      "command": "tox -e api",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: validate",
+      "type": "shell",
+      "command": "tox -e lint,type,test,api",
+      "group": { "kind": "build", "isDefault": false },
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    // ── Frontend validation (tox) ──────────────────────────────────────────
+    {
+      "label": "Frontend: type-check",
+      "type": "shell",
+      "command": "tox -e web-typecheck",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "Frontend: build",
+      "type": "shell",
+      "command": "tox -e web-build",
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "Frontend: component tests",
+      "type": "shell",
+      "command": "tox -e web-test",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: storybook build",
+      "type": "shell",
+      "command": "tox -e web-storybook",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: validate",
+      "type": "shell",
+      "command": "tox -e web-typecheck,web-build,web-test,web-storybook",
+      "group": { "kind": "build", "isDefault": false },
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": ["$tsc"]
+    },
+    // ── CI (tox) ───────────────────────────────────────────────────────────
+    {
+      "label": "CI: all",
+      "type": "shell",
+      "command": "tox",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    },
+    {
+      "label": "CI: e2e (requires Next.js: dev)",
+      "type": "shell",
+      "command": "tox -e web-e2e",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": []
+    }
+  ]
+}
