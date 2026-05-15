@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-import logging
+import time
 from typing import Callable
 
+import structlog
 from rich.console import Console
-from rich.logging import RichHandler
 
 import json
 from pathlib import Path
 
 from .candidates.builder import build_candidates, save_candidates
+from .checkpoints import CheckpointManager
+from .logging import configure_logging as _configure_logging
 from .twitch.chat import download_chat
 from .rendering.clipper import cut_all_clips
 from .rendering.detect import load_or_detect_webcam_rect
@@ -26,7 +28,7 @@ from .transcription.transcriber import transcribe
 from .twitch.client import TwitchClient
 
 console = Console()
-log = logging.getLogger(__name__)
+log = structlog.get_logger()
 
 
 def save_picks(picks: list[PickResult], path: Path) -> None:
@@ -38,11 +40,7 @@ def save_picks(picks: list[PickResult], path: Path) -> None:
 
 
 def _setup_logging(verbose: bool) -> None:
-    logging.basicConfig(
-        level=logging.DEBUG if verbose else logging.INFO,
-        format="%(message)s",
-        handlers=[RichHandler(console=console, rich_tracebacks=True, show_path=False)],
-    )
+    _configure_logging(verbose=verbose)
 
 
 def process_vod(
@@ -59,12 +57,18 @@ def process_vod(
     max_candidates: int = 20,
     start_s: float = 0.0,
     on_stage: Callable[[str, float], None] | None = None,
+    resume: bool = False,
 ) -> None:
     """Run the full pipeline for one VOD: download → transcribe → candidates → select → clip."""
     video_id = video.id
     work_dir = cfg.work_dir.expanduser()
     vod_dir = work_dir / video_id
     vod_dir.mkdir(parents=True, exist_ok=True)
+
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(vod_id=video_id)
+
+    ckpt = CheckpointManager(cfg.work_dir.expanduser() / cfg.checkpoint.dir, video_id)
 
     if secrets.twitch_client_id and secrets.twitch_client_secret and video.user_id:
         with TwitchClient(secrets.twitch_client_id, secrets.twitch_client_secret) as tc:
@@ -80,10 +84,17 @@ def process_vod(
 
     if on_stage:
         on_stage("download", 5.0)
-    if not skip_download:
+    _t0 = time.monotonic()
+    log.info("stage_start", stage="download")
+    if resume and ckpt.is_done("download"):
+        log.info("stage_skip", stage="download")
+        mp4_path = vod_dir / f"{video_id}.mp4"
+    elif not skip_download:
         console.print("[cyan]downloading...[/cyan]")
         result = download_vod(video_id, work_dir)
         mp4_path = result.mp4_path
+        ckpt.mark_done("download")
+        log.info("stage_done", stage="download", elapsed_ms=round((time.monotonic() - _t0) * 1000))
     else:
         mp4_path = vod_dir / f"{video_id}.mp4"
         if not mp4_path.exists():
@@ -96,13 +107,18 @@ def process_vod(
 
     if on_stage:
         on_stage("transcribe", 15.0)
-    console.print(f"[cyan]transcribing[/cyan] {mp4_path.name} ...")
-    transcript = transcribe(
-        mp4_path,
-        video_id,
-        cfg.transcribe,
-        overwrite=not skip_transcribe,
-    )
+    _t0 = time.monotonic()
+    log.info("stage_start", stage="transcribe")
+    if resume and ckpt.is_done("transcribe"):
+        log.info("stage_skip", stage="transcribe")
+        transcript = transcribe(mp4_path, video_id, cfg.transcribe, overwrite=False)
+    else:
+        console.print(f"[cyan]transcribing[/cyan] {mp4_path.name} ...")
+        transcript = transcribe(mp4_path, video_id, cfg.transcribe, overwrite=not skip_transcribe)
+        ckpt.mark_done("transcribe")
+        log.info(
+            "stage_done", stage="transcribe", elapsed_ms=round((time.monotonic() - _t0) * 1000)
+        )
     if start_s > 0:
         before = len(transcript.segments)
         transcript.segments = [s for s in transcript.segments if s.start >= start_s]
@@ -119,8 +135,16 @@ def process_vod(
 
     if on_stage:
         on_stage("chat", 40.0)
-    console.print("[cyan]downloading chat...[/cyan]")
-    chat = download_chat(video_id, work_dir, overwrite=not skip_chat)
+    _t0 = time.monotonic()
+    log.info("stage_start", stage="chat")
+    if resume and ckpt.is_done("chat"):
+        log.info("stage_skip", stage="chat")
+        chat = download_chat(video_id, work_dir, overwrite=False)
+    else:
+        console.print("[cyan]downloading chat...[/cyan]")
+        chat = download_chat(video_id, work_dir, overwrite=not skip_chat)
+        ckpt.mark_done("chat")
+        log.info("stage_done", stage="chat", elapsed_ms=round((time.monotonic() - _t0) * 1000))
     if start_s > 0:
         before = len(chat.messages)
         chat.messages = [m for m in chat.messages if m.time_in_seconds >= start_s]
@@ -129,6 +153,7 @@ def process_vod(
         )
     console.print(f"[green]chat loaded[/green]: {len(chat.messages)} messages")
 
+    log.info("stage_start", stage="candidates")
     if on_stage:
         on_stage("candidates", 50.0)
     console.print("[cyan]scoring candidates...[/cyan]")
@@ -153,6 +178,7 @@ def process_vod(
             t += interval
 
     save_candidates(candidates, vod_dir / "candidates.json")
+    ckpt.mark_done("candidates")
     console.print(f"[green]candidates[/green]: {len(candidates)} moments")
     for i, c in enumerate(candidates[:10], 1):
         console.print(
@@ -166,6 +192,8 @@ def process_vod(
     if provider:
         cfg.llm.provider = provider  # type: ignore[assignment]
 
+    _t0 = time.monotonic()
+    log.info("stage_start", stage="select")
     if on_stage:
         on_stage("select", 60.0)
     console.print(
@@ -187,6 +215,8 @@ def process_vod(
     )
     picks_path = vod_dir / "picks.json"
     save_picks(picks, picks_path)
+    ckpt.mark_done("select")
+    log.info("stage_done", stage="select", elapsed_ms=round((time.monotonic() - _t0) * 1000))
     console.print(f"[green]picks[/green]: {len(picks)} accepted -> {picks_path}")
     for i, pr in enumerate(picks, 1):
         console.print(
@@ -198,9 +228,13 @@ def process_vod(
         console.print("[yellow]clipping skipped (--skip-clip)[/yellow]")
         return
 
+    _t0 = time.monotonic()
+    log.info("stage_start", stage="render")
     if on_stage:
         on_stage("clip", 85.0)
     out_dir = cfg.out_dir.expanduser() / video_id
     console.print(f"[cyan]cutting clips[/cyan] -> {out_dir}")
     clip_paths = cut_all_clips(mp4_path, transcript, picks, out_dir, cfg)
+    ckpt.mark_done("render")
+    log.info("stage_done", stage="render", elapsed_ms=round((time.monotonic() - _t0) * 1000))
     console.print(f"[green]done[/green]: {len(clip_paths)} clip(s) in {out_dir}")

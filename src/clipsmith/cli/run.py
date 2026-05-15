@@ -11,7 +11,8 @@ from rich.console import Console
 
 from .utils import _parse_start_at, _resolve_config
 from ..models.twitch import Video
-from ..pipeline import process_vod, _setup_logging
+from ..pipeline import process_vod
+from ..logging import configure_logging
 from ..settings import load_config, load_secrets
 from ..twitch.state import State
 from ..twitch.client import TwitchClient
@@ -40,9 +41,13 @@ def process(
         None, "--start-at", help="Skip content before this timestamp (MM:SS, H:MM:SS, or seconds)"
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
+    json_logs: bool = typer.Option(False, "--json-logs", help="Emit newline-delimited JSON logs"),
+    resume: bool = typer.Option(
+        False, "--resume/--no-resume", help="Skip stages that already completed"
+    ),
 ) -> None:
     """Process a local MP4 through the full pipeline: transcribe -> LLM -> clips."""
-    _setup_logging(verbose)
+    configure_logging(verbose=verbose, json_logs=json_logs)
 
     if not mp4.exists():
         console.print(f"[red]File not found:[/red] {mp4}")
@@ -94,6 +99,7 @@ def process(
             skip_chat=True,
             provider=provider,
             start_s=_parse_start_at(start_at),
+            resume=resume,
         )
     except FileNotFoundError as exc:
         console.print(f"[red]{exc}[/red]")
@@ -107,7 +113,7 @@ def watch(
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Poll Twitch for new archive VODs and run the full pipeline for each."""
-    _setup_logging(verbose)
+    configure_logging(verbose=verbose)
     cfg = load_config(config_path)
     if channel:
         cfg.channels = [channel]
@@ -159,9 +165,13 @@ def run_vod(
         None, "--start-at", help="Skip content before this timestamp (MM:SS, H:MM:SS, or seconds)"
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
+    json_logs: bool = typer.Option(False, "--json-logs", help="Emit newline-delimited JSON logs"),
+    resume: bool = typer.Option(
+        False, "--resume/--no-resume", help="Skip stages that already completed"
+    ),
 ) -> None:
     """Download, transcribe, score candidates, and select clips via LLM."""
-    _setup_logging(verbose)
+    configure_logging(verbose=verbose, json_logs=json_logs)
     cfg = load_config(config_path)
     if captions is not None:
         cfg.caption.enabled = captions
@@ -234,6 +244,7 @@ def run_vod(
             provider=provider,
             max_candidates=max_candidates,
             start_s=_parse_start_at(start_at),
+            resume=resume,
         )
     except FileNotFoundError as exc:
         console.print(f"[red]{exc}[/red]")
@@ -261,7 +272,7 @@ def whoami(
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Sanity check: resolve a Twitch login to a user id via Helix."""
-    _setup_logging(verbose)
+    configure_logging(verbose=verbose)
     secrets = load_secrets()
     with TwitchClient(secrets.twitch_client_id, secrets.twitch_client_secret) as tc:
         user_id = tc.get_user_id(login)
