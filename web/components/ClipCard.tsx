@@ -49,7 +49,7 @@ export function ClipCard({ clip: initialClip, onUpdate }: Props) {
           <div className="flex items-start gap-2">
             <p className="text-sm font-medium flex-1 leading-tight truncate">
               {clip.title || (
-                <span className="text-muted-foreground italic">untitled</span>
+                <em className="text-muted-foreground">untitled</em>
               )}
             </p>
             {clip.approved === true && <Badge variant="secondary">Approved</Badge>}
