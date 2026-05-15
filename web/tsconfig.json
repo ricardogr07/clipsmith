@@ -30,5 +30,13 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "**/*.stories.*",
+    "cypress/**/*",
+    ".storybook/**/*",
+    "stories/**/*",
+    "vitest.config.ts",
+    "vitest.shims.d.ts"
+  ]
 }
