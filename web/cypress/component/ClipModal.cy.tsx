@@ -40,7 +40,7 @@ describe("ClipModal", () => {
   it("Escape key calls onClose", () => {
     const onClose = cy.spy().as("onClose");
     cy.mount(<ClipModal clip={base} onClose={onClose} onUpdate={cy.spy()} />);
-    cy.get("body").type("{esc}");
+    cy.get("body").trigger("keydown", { key: "Escape", bubbles: true });
     cy.get("@onClose").should("have.been.calledOnce");
   });
 

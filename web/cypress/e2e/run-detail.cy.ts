@@ -32,9 +32,9 @@ describe("Run detail page", () => {
     cy.intercept("PATCH", "/api/clips/1", { body: updatedClip }).as("patchClip");
     cy.visit("/runs/1");
     cy.wait("@getClips");
-    cy.contains("Epic play").parents("[class*=Card]").contains("Approve").click();
+    cy.contains("Epic play").parents("[data-slot=card]").contains("Approve").click();
     cy.wait("@patchClip");
-    cy.contains("Epic play").parents("[class*=Card]").contains("Approved").should("be.visible");
+    cy.contains("Epic play").parents("[data-slot=card]").contains("Approved").should("be.visible");
   });
 
   it("shows error message and Back button for a 404 run", () => {
