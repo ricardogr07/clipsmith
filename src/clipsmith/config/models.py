@@ -38,11 +38,20 @@ class TranscribeConfig(BaseModel):
     max_workers: int = 4  # ThreadPoolExecutor concurrency for parallel transcription
 
 
+class RetryConfig(BaseModel):
+    max_attempts: int = 3
+    wait_min_s: float = 1.0
+    wait_max_s: float = 30.0
+    multiplier: float = 2.0
+    jitter: bool = True
+
+
 class LLMConfig(BaseModel):
     provider: Literal["openai", "anthropic", "ollama"] = "anthropic"
     model_anthropic: str = "claude-sonnet-4-6"
     model_openai: str = "gpt-4.1"
     model_ollama: str = "llama3.1:8b"
+    retry: RetryConfig = RetryConfig()
 
 
 class CaptionConfig(BaseModel):
@@ -71,6 +80,11 @@ class CloudConfig(BaseModel):
     gpu_sku: str = ""  # e.g. "V100" — empty means CPU-only
 
 
+class CheckpointConfig(BaseModel):
+    enabled: bool = True
+    dir: str = ".checkpoints"
+
+
 class AppConfig(BaseModel):
     channels: list[str] = Field(default_factory=list)
     poll_interval_s: int = 120
@@ -83,3 +97,4 @@ class AppConfig(BaseModel):
     caption: CaptionConfig = CaptionConfig()
     reframe: ReframeConfig = ReframeConfig()
     cloud: CloudConfig = CloudConfig()
+    checkpoint: CheckpointConfig = CheckpointConfig()
