@@ -29,6 +29,8 @@ dependencies = [
     "twitch-dl>=3.3",
     "openai>=1.40",
     "anthropic>=0.40",
+    "structlog>=24.1",
+    "tenacity>=8.2",
 ]
 
 [project.urls]
