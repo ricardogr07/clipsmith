@@ -1,4 +1,5 @@
 .env
+web/.env.local
 *-sa.json
 google_oauth_client.json
 ~/.clipsmith_drive_token.json

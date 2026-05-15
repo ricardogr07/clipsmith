@@ -21,4 +21,11 @@ def get_provider(config: AppConfig, secrets: Secrets) -> ClipPicker:
     raise ValueError(f"Unknown LLM provider: {provider!r}")
 
 
-__all__ = ["ClipPick", "ClipPicker", "AnthropicProvider", "OpenAIProvider", "OllamaProvider", "get_provider"]
+__all__ = [
+    "ClipPick",
+    "ClipPicker",
+    "AnthropicProvider",
+    "OpenAIProvider",
+    "OllamaProvider",
+    "get_provider",
+]
