@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import asdict, dataclass
 
 from ..llm.base import ClipPick, ClipPicker
@@ -78,10 +79,21 @@ def select_clips(
             candidate.sources,
         )
         window = _extract_transcript_window(transcript, candidate.t_center)
+        t0 = time.monotonic()
         pick = picker.pick(window, candidate, stream_context)
+        elapsed_ms = round((time.monotonic() - t0) * 1000)
         if pick is None:
             log.warning("picker returned None for t=%.1f — skipping", candidate.t_center)
             continue
+        log.info(
+            "llm_pick",
+            extra={
+                "candidate_id": f"{candidate.t_center:.1f}",
+                "include": pick.include,
+                "score": round(candidate.score, 2),
+                "elapsed_ms": elapsed_ms,
+            },
+        )
         if not pick.include:
             log.debug("LLM rejected t=%.1f: %s", candidate.t_center, pick.reason)
             continue

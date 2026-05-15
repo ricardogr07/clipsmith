@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import structlog
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +23,8 @@ log = logging.getLogger(__name__)
 
 def start_run(run_id: int, vod_id: str, channel: str, provider: str | None) -> None:
     """Entry point for BackgroundTasks. Opens its own DB session for thread safety."""
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(run_id=run_id, vod_id=vod_id)
     db = get_session()
     try:
         _run_pipeline(db, run_id, vod_id, channel, provider)
