@@ -79,6 +79,49 @@ def clip_cmd(
     console.print(f"[green]done[/green]: {len(clip_paths)} clip(s) in {out_dir}")
 
 
+def publish_cmd(
+    clip_id: int = typer.Argument(..., help="DB clip ID to upload"),
+) -> None:
+    """Upload an approved clip from the DB to YouTube Shorts."""
+    from ..db.session import init_db, get_session
+    from ..db.models import Clip as ClipModel
+
+    cfg = load_config(Path("config.yaml"))
+    db_path = cfg.work_dir.expanduser() / "clipsmith.db"
+    init_db(db_path)
+    db = get_session()
+    try:
+        clip = db.get(ClipModel, clip_id)
+        if not clip:
+            console.print(f"[red]Clip {clip_id} not found in DB.[/red]")
+            raise typer.Exit(1)
+        if not clip.approved:
+            console.print("[red]Clip must be approved before publishing.[/red]")
+            raise typer.Exit(1)
+        if clip.published_url:
+            console.print(f"[yellow]Already published:[/yellow] {clip.published_url}")
+            return
+
+        from ..publish.youtube import YouTubePublisher
+
+        publisher = YouTubePublisher(
+            credentials_file=cfg.publish.youtube_credentials,
+            token_file=cfg.publish.youtube_token,
+        )
+        video_path = cfg.out_dir.expanduser() / clip.filename
+        url = publisher.upload(
+            video_path,
+            title=clip.title or clip.filename,
+            privacy=cfg.publish.youtube_privacy,
+            category_id=cfg.publish.youtube_category,
+        )
+        clip.published_url = url
+        db.commit()
+        console.print(f"[green]Published:[/green] {url}")
+    finally:
+        db.close()
+
+
 def reframe_cmd(
     video_id: str = typer.Argument(..., help="Video ID (folder name in work/ and out/)"),
     clips: list[str] = typer.Argument(..., help="Clip identifiers e.g. clip_01 clip_03"),
