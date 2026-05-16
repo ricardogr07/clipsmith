@@ -22,34 +22,6 @@ from ..settings import CandidatesConfig
 
 __all__ = ["CandidateMoment", "build_candidates", "save_candidates", "load_candidates"]
 
-# Spanish/stream hype keywords that suggest a funny or exciting moment.
-_HYPE_KEYWORDS = frozenset(
-    {
-        "jaja",
-        "jeje",
-        "jajaj",
-        "jajaja",
-        "lmao",
-        "lol",
-        "xd",
-        "xdd",
-        "omg",
-        "wow",
-        "nooo",
-        "noooo",
-        "increíble",
-        "increible",
-        "tremendo",
-        "brutal",
-        "dios",
-        "wtf",
-        "carajo",
-        "caray",
-        "bestia",
-        "monstro",
-    }
-)
-
 
 def build_candidates(
     chat: ChatLog,
@@ -106,9 +78,10 @@ def build_candidates(
 
     # --- Signal 4: transcript hype moments (laughter/exclamations in speech) ---
     if transcript is not None:
+        _kw = frozenset(kw.lower() for kw in config.hype_keywords)
         for seg in transcript.segments:
             text = seg.text.lower()
-            kw_hits = sum(1 for kw in _HYPE_KEYWORDS if kw in text)
+            kw_hits = sum(1 for kw in _kw if kw in text)
             punct_hits = text.count("!") + text.count("¡")
             score = kw_hits * config.transcript_hype_score + punct_hits * (
                 config.transcript_hype_score / 3

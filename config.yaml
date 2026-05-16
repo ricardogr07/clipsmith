@@ -32,13 +32,38 @@ candidates:
   audio_energy_window_s: 2.0         # RMS window size in seconds
   audio_energy_peak_multiplier: 2.0  # threshold = mean + N*std (higher = fewer peaks)
   audio_energy_boost: 15.0           # score multiplier per peak
+  # Keywords in speech that signal excitement — extend freely in config without touching source
+  hype_keywords:
+    - jaja
+    - jeje
+    - jajaj
+    - jajaja
+    - lmao
+    - lol
+    - xd
+    - xdd
+    - omg
+    - wow
+    - nooo
+    - noooo
+    - increíble
+    - increible
+    - tremendo
+    - brutal
+    - dios
+    - wtf
+    - carajo
+    - caray
+    - bestia
+    - monstro
 
 transcribe:
   # faster-whisper model: tiny | base | small | medium | large-v3
   model: small
   # int8 is the recommended CPU quantization
   compute_type: int8
-  language: es
+  # "auto" lets faster-whisper detect language per stream; set "es"/"en" to force
+  language: auto
   # Parallel chunked transcription (recommended for streams > 1 hr on CPU)
   chunk_minutes: 30    # split into 30-min chunks transcribed concurrently
   chunk_overlap_s: 30  # overlap between chunks to avoid cutting words at boundaries
@@ -68,6 +93,16 @@ cloud:
   aci_memory_gb: 16.0
   docker_image: "ricardogr007/clipsmith:latest"
   gpu_sku: ""                  # V100 | P100 | K80 - leave empty for CPU-only
+
+publish:
+  # Path to the OAuth2 client secret JSON from Google Cloud Console
+  youtube_credentials: credentials.json
+  # Cached access token (auto-created on first upload via browser OAuth flow)
+  youtube_token: .youtube_token.json
+  # Privacy status for uploaded clips: private | unlisted | public
+  youtube_privacy: private
+  # YouTube category ID (20 = Gaming)
+  youtube_category: 20
 
 reframe:
   # center | webcam | stacked | face (future) | none

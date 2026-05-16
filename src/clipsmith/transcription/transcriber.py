@@ -57,9 +57,10 @@ def _transcribe_chunk(
     config: TranscribeConfig,
 ) -> list[Segment]:
     """Transcribe one audio chunk and adjust timestamps by offset_s."""
+    lang = None if config.language == "auto" else config.language
     raw_segments, _ = model.transcribe(
         str(wav_path),
-        language=config.language,
+        language=lang,
         word_timestamps=True,
         beam_size=5,
         vad_filter=True,
