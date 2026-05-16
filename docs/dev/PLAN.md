@@ -86,7 +86,7 @@ web/                        Next.js 14 App Router
 - Schema validation on LLM JSON responses (required keys + offset clamping)
 - `--resume` flag on `clipsmith run-vod`
 
-**Status:** 🚧 In Progress
+**Status:** ✅ Done
 
 ---
 
@@ -101,7 +101,7 @@ web/                        Next.js 14 App Router
 - OpenAPI tags + descriptions on all routes, `GET /` → `/docs`
 - Rate limiting on `POST /runs` (1 concurrent run per server)
 
-**Status:** 🔜 Planned
+**Status:** 🚧 In Progress
 
 ---
 

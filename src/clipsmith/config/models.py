@@ -27,12 +27,36 @@ class CandidatesConfig(BaseModel):
     audio_energy_window_s: float = 2.0
     audio_energy_peak_multiplier: float = 2.0
     audio_energy_boost: float = 15.0
+    hype_keywords: list[str] = [
+        "jaja",
+        "jeje",
+        "jajaj",
+        "jajaja",
+        "lmao",
+        "lol",
+        "xd",
+        "xdd",
+        "omg",
+        "wow",
+        "nooo",
+        "noooo",
+        "increíble",
+        "increible",
+        "tremendo",
+        "brutal",
+        "dios",
+        "wtf",
+        "carajo",
+        "caray",
+        "bestia",
+        "monstro",
+    ]
 
 
 class TranscribeConfig(BaseModel):
     model: str = "medium"
     compute_type: str = "int8"
-    language: str = "es"
+    language: str = "auto"  # "auto" → language=None to faster-whisper (auto-detect)
     chunk_minutes: int = 0  # 0 = disabled; >0 splits audio into N-minute chunks
     chunk_overlap_s: int = 30  # overlap between adjacent chunks to avoid boundary word loss
     max_workers: int = 4  # ThreadPoolExecutor concurrency for parallel transcription
@@ -85,6 +109,13 @@ class CheckpointConfig(BaseModel):
     dir: str = ".checkpoints"
 
 
+class PublishConfig(BaseModel):
+    youtube_credentials: str = "credentials.json"
+    youtube_token: str = ".youtube_token.json"
+    youtube_privacy: Literal["private", "unlisted", "public"] = "private"
+    youtube_category: int = 20  # 20 = Gaming
+
+
 class AppConfig(BaseModel):
     channels: list[str] = Field(default_factory=list)
     poll_interval_s: int = 120
@@ -98,3 +129,4 @@ class AppConfig(BaseModel):
     reframe: ReframeConfig = ReframeConfig()
     cloud: CloudConfig = CloudConfig()
     checkpoint: CheckpointConfig = CheckpointConfig()
+    publish: PublishConfig = PublishConfig()
