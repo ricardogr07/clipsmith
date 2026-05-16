@@ -19,8 +19,9 @@ except PackageNotFoundError:
     _VERSION = "dev"
 
 
-@router.get("/health")
+@router.get("/health", summary="Health check")
 def health(db: Session = Depends(get_db)) -> dict:
+    """Return server and database status. Always 200; check 'db' field for DB health."""
     try:
         db.execute(text("SELECT 1"))
         db_status = "ok"
@@ -29,7 +30,8 @@ def health(db: Session = Depends(get_db)) -> dict:
     return {"status": "ok", "db": db_status, "version": _VERSION}
 
 
-@router.get("/metrics")
+@router.get("/metrics", summary="Run metrics")
 def metrics(db: Session = Depends(get_db)) -> dict:
+    """Return pipeline run counts grouped by status (pending/running/done/failed)."""
     counts = {s.value: db.query(Run).filter(Run.status == s).count() for s in RunStatus}
     return {"runs_by_status": counts}

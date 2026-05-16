@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -19,28 +19,40 @@ class RunCreate(BaseModel):
     provider: str | None = None
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, summary="Create a pipeline run")
 def create_run(
     body: RunCreate,
+    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> dict:
+    """Start an async pipeline run for the given VOD ID. Returns the new run record.
+
+    Returns 429 if a run is already in progress on this server.
+    """
+    if request.app.state.active_run_id is not None:
+        raise HTTPException(429, "A pipeline run is already in progress")
     run = Run(vod_id=body.vod_id, channel=body.channel, status=RunStatus.pending)
     db.add(run)
     db.commit()
     db.refresh(run)
-    background_tasks.add_task(start_run, run.id, body.vod_id, body.channel, body.provider)
+    request.app.state.active_run_id = run.id
+    background_tasks.add_task(
+        start_run, run.id, body.vod_id, body.channel, body.provider, request.app
+    )
     return run.to_dict()
 
 
-@router.get("")
+@router.get("", summary="List all runs")
 def list_runs(db: Session = Depends(get_db)) -> list[dict]:
+    """Return all pipeline runs ordered by creation time descending."""
     runs = db.query(Run).order_by(Run.created_at.desc()).all()
     return [r.to_dict() for r in runs]
 
 
-@router.get("/{run_id}")
+@router.get("/{run_id}", summary="Get a run by ID")
 def get_run(run_id: int, db: Session = Depends(get_db)) -> dict:
+    """Return a single run record. 404 if not found."""
     run = db.get(Run, run_id)
     if not run:
         raise HTTPException(404, "Run not found")

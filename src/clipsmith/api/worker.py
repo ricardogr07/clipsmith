@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import logging
 import re
-import structlog
 import unicodedata
 from datetime import datetime, timezone
+from typing import Any
+
+import structlog
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -21,7 +23,9 @@ from ..settings import AppConfig, load_config, load_secrets
 log = logging.getLogger(__name__)
 
 
-def start_run(run_id: int, vod_id: str, channel: str, provider: str | None) -> None:
+def start_run(
+    run_id: int, vod_id: str, channel: str, provider: str | None, app: Any = None
+) -> None:
     """Entry point for BackgroundTasks. Opens its own DB session for thread safety."""
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(run_id=run_id, vod_id=vod_id)
@@ -41,6 +45,8 @@ def start_run(run_id: int, vod_id: str, channel: str, provider: str | None) -> N
             log.exception("could not persist failure state for run %d", run_id)
     finally:
         db.close()
+        if app is not None:
+            app.state.active_run_id = None
 
 
 def _emit(
