@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/ricardogr07/clipsmith/compare/v0.2.1...v0.3.0) (2026-05-16)
+
+
+### Features
+
+* Spanish Colab notebook + Drive save with clip selection ([#6](https://github.com/ricardogr07/clipsmith/issues/6)) ([24a58bc](https://github.com/ricardogr07/clipsmith/commit/24a58bc5997c2612c5ee05e1e7c5b9d68e8157d6))
+* Sprint 1 — FastAPI REST layer + SQLite persistence ([#7](https://github.com/ricardogr07/clipsmith/issues/7)) ([0f64418](https://github.com/ricardogr07/clipsmith/commit/0f644181c0cfdc71a888687b96c1987852b461c9))
+* Sprint 2 — Next.js 16 dashboard ([#9](https://github.com/ricardogr07/clipsmith/issues/9)) ([ea7b0be](https://github.com/ricardogr07/clipsmith/commit/ea7b0bebde1a40dc2975738a2a3698260a9f13f0))
+* Sprint 3 — Observability + Pipeline Reliability ([#11](https://github.com/ricardogr07/clipsmith/issues/11)) ([858f447](https://github.com/ricardogr07/clipsmith/commit/858f447735585942fcc0f1da1bbf3af8a0698638))
+* Sprint 4 — Publishing + Polish ([#12](https://github.com/ricardogr07/clipsmith/issues/12)) ([4d48e73](https://github.com/ricardogr07/clipsmith/commit/4d48e7367944da1b67714dee1b75b4434fb5e855))
+
+
+### Bug Fixes
+
+* use PAT for release-please so tag pushes trigger publish workflow ([#4](https://github.com/ricardogr07/clipsmith/issues/4)) ([50e0610](https://github.com/ricardogr07/clipsmith/commit/50e0610cb5aa739a6769e44f9ac8aa031645ff2d))
+
 ## [0.2.1](https://github.com/ricardogr07/clipsmith/compare/v0.2.0...v0.2.1) (2026-05-09)
 
 
