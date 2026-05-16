@@ -68,6 +68,7 @@ class Clip(Base):
     end_s: Mapped[float] = mapped_column(Float, default=0.0)
     score: Mapped[float] = mapped_column(Float, default=0.0)
     approved: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    published_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=_now)
 
     run: Mapped[Run] = relationship(back_populates="clips")
@@ -82,6 +83,7 @@ class Clip(Base):
             "end_s": self.end_s,
             "score": self.score,
             "approved": self.approved,
+            "published_url": self.published_url,
             "created_at": self.created_at.isoformat(),
         }
 

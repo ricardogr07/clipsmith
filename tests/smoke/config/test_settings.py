@@ -12,7 +12,7 @@ def test_load_real_config() -> None:
     assert isinstance(cfg, AppConfig)
     assert cfg.clip.min_seconds == 15
     assert cfg.clip.max_seconds == 30
-    assert cfg.transcribe.language == "es"
+    assert cfg.transcribe.language == "auto"
     assert cfg.llm.provider in {"openai", "anthropic", "ollama"}
     assert isinstance(cfg.caption.enabled, bool)
     assert cfg.reframe.mode in {"center", "webcam", "face", "none", "stacked"}

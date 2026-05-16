@@ -62,14 +62,17 @@ vision = [
 ollama = [
     "ollama>=0.3",
 ]
+publish = [
+    "google-api-python-client>=2",
+    "google-auth-oauthlib>=1",
+]
 cloud = [
     "azure-mgmt-containerinstance>=10",
     "azure-mgmt-resource>=23",
     "azure-mgmt-storage>=21",
     "azure-storage-file-share>=12",
     "azure-identity>=1.16",
-    "google-api-python-client>=2",
-    "google-auth-oauthlib>=1",
+    "clipsmith-ai[publish]",
 ]
 
 [project.scripts]

@@ -17,9 +17,10 @@ router = APIRouter(tags=["stream"])
 _POLL_INTERVAL = 0.5  # seconds between DB polls
 
 
-@router.get("/runs/{run_id}/progress")
+@router.get("/runs/{run_id}/progress", summary="Stream pipeline progress (SSE)")
 def stream_progress(run_id: int) -> StreamingResponse:
-    # Validate run exists before opening the streaming response.
+    """Server-Sent Events stream of PipelineEvent rows for the given run.
+    Closes automatically when the run reaches done or failed status."""
     db = get_session()
     try:
         run = db.get(Run, run_id)

@@ -15,8 +15,9 @@ from ...settings import load_config
 router = APIRouter(tags=["files"])
 
 
-@router.get("/runs/{run_id}/clips/file/{filename}")
+@router.get("/runs/{run_id}/clips/file/{filename}", summary="Download a clip file")
 def serve_clip(run_id: int, filename: str, db: Session = Depends(get_db)) -> FileResponse:
+    """Serve the MP4 clip file associated with the given run and filename."""
     if "/" in filename or "\\" in filename or ".." in filename or not filename.endswith(".mp4"):
         raise HTTPException(400, "Invalid filename")
 

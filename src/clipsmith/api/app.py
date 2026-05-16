@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from .routes import clips, files, health, runs, stream
+from .routes import clips, files, health, publish, runs, stream
 from ..db.session import init_db
 from ..settings import load_config
 
@@ -21,6 +21,7 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db_path = cfg.work_dir.expanduser() / "clipsmith.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
     init_db(db_path)
+    app.state.active_run_id = None  # int | None; cleared by worker on completion
     yield
 
 
@@ -44,6 +45,7 @@ app.include_router(clips.router)
 app.include_router(stream.router)
 app.include_router(files.router)
 app.include_router(health.router)
+app.include_router(publish.router)
 
 
 @app.get("/", include_in_schema=False)
