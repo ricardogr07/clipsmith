@@ -36,6 +36,7 @@ class YouTubePublisher:
             flow = InstalledAppFlow.from_client_secrets_file(self._credentials_file, SCOPES)
             creds = flow.run_local_server(port=0)
             self._token_file.write_text(creds.to_json())
+            self._token_file.chmod(0o600)
 
         from googleapiclient.discovery import build
 

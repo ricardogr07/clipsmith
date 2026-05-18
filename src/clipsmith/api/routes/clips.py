@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..deps import get_db
+from ..deps import get_db, verify_api_key
 from ...db.models import Clip, Run
 
 router = APIRouter(tags=["clips"])
@@ -25,7 +25,9 @@ def list_clips(run_id: int, db: Session = Depends(get_db)) -> list[dict]:
     return [c.to_dict() for c in run.clips]
 
 
-@router.patch("/clips/{clip_id}", summary="Approve or reject a clip")
+@router.patch(
+    "/clips/{clip_id}", summary="Approve or reject a clip", dependencies=[Depends(verify_api_key)]
+)
 def patch_clip(clip_id: int, body: ClipPatch, db: Session = Depends(get_db)) -> dict:
     """Set approved=true/false on a clip. 404 if clip not found."""
     clip = db.get(Clip, clip_id)
