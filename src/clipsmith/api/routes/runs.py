@@ -2,24 +2,38 @@
 
 from __future__ import annotations
 
+import re
+from typing import Literal
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
-from ..deps import get_db
+from ..deps import get_db, verify_api_key
 from ..worker import start_run
 from ...db.models import Run, RunStatus
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
+_VOD_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+
 
 class RunCreate(BaseModel):
     vod_id: str
     channel: str = ""
-    provider: str | None = None
+    provider: Literal["anthropic", "openai", "ollama"] | None = None
+
+    @field_validator("vod_id")
+    @classmethod
+    def validate_vod_id(cls, v: str) -> str:
+        if not _VOD_ID_RE.match(v):
+            raise ValueError("vod_id must be 1–64 alphanumeric characters, underscores, or hyphens")
+        return v
 
 
-@router.post("", status_code=201, summary="Create a pipeline run")
+@router.post(
+    "", status_code=201, summary="Create a pipeline run", dependencies=[Depends(verify_api_key)]
+)
 def create_run(
     body: RunCreate,
     request: Request,

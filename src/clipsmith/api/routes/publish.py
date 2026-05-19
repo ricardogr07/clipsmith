@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..deps import get_db
+from ..deps import get_db, verify_api_key
 from ...db.models import Clip
 from ...publish.youtube import YouTubePublisher
 from ...settings import load_config
@@ -18,6 +18,7 @@ router = APIRouter(tags=["publish"])
 @router.post(
     "/clips/{clip_id}/publish",
     summary="Publish an approved clip to YouTube Shorts",
+    dependencies=[Depends(verify_api_key)],
 )
 def publish_clip(clip_id: int, db: Session = Depends(get_db)) -> dict:
     """Upload the clip file to YouTube Shorts and persist the watch URL.
@@ -34,9 +35,12 @@ def publish_clip(clip_id: int, db: Session = Depends(get_db)) -> dict:
         return clip.to_dict()
 
     cfg = load_config(Path("config.yaml"))
-    video_path = cfg.out_dir.expanduser() / clip.filename
+    out_root = cfg.out_dir.expanduser().resolve()
+    video_path = (out_root / clip.filename).resolve()
+    if not video_path.is_relative_to(out_root):
+        raise HTTPException(400, "Invalid clip path")
     if not video_path.exists():
-        raise HTTPException(404, f"Clip file not found on disk: {clip.filename}")
+        raise HTTPException(404, "Clip file not found")
 
     publisher = YouTubePublisher(
         credentials_file=cfg.publish.youtube_credentials,
