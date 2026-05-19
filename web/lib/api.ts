@@ -8,14 +8,11 @@ const PROXY = "/api";
 // connection that the Next.js rewrite layer doesn't guarantee.
 const DIRECT = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
-const KEY = process.env.NEXT_PUBLIC_API_KEY ?? "";
-
 async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${PROXY}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(KEY ? { "X-Api-Key": KEY } : {}),
       ...init.headers,
     },
   });

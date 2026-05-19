@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
@@ -20,7 +21,7 @@ _VOD_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 class RunCreate(BaseModel):
     vod_id: str
     channel: str = ""
-    provider: str | None = None
+    provider: Literal["anthropic", "openai", "ollama"] | None = None
 
     @field_validator("vod_id")
     @classmethod

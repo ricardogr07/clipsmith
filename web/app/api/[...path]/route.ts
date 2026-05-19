@@ -8,6 +8,11 @@ async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
 
   const headers = new Headers(req.headers);
   headers.delete("host");
+  // Inject API key server-side so it is never exposed to the browser
+  const apiKey = process.env.API_KEY;
+  if (apiKey) {
+    headers.set("X-Api-Key", apiKey);
+  }
 
   const hasBody = req.method !== "GET" && req.method !== "HEAD";
   try {
