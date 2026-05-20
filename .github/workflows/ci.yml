@@ -38,4 +38,5 @@ jobs:
       - run: pip install --upgrade pip
       - run: pip install -e ".[dev]"
       - run: bandit -r src/ -ll -x tests/
-      - run: pip-audit --skip-editable
+      # PYSEC-2026-89: markdown 3.10.2 — transitive dep via mkdocs (dev only, no fix available yet)
+      - run: pip-audit --skip-editable --ignore-vuln PYSEC-2026-89
