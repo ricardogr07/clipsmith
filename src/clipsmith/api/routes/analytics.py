@@ -102,9 +102,12 @@ def calibrate_run(run_id: int, db: Session = Depends(get_db)) -> dict:
     weights: list[dict] = []
     for signal, outcomes in sorted(signal_outcomes.items()):
         approval_rate = sum(outcomes) / len(outcomes)
-        ema = approval_rate
-        for _ in range(len(outcomes) - 1):
-            ema = alpha * approval_rate + (1 - alpha) * ema
+        # EMA over individual binary outcomes in clip insertion order.
+        # Starts at the first outcome (0.0 or 1.0); each subsequent outcome
+        # nudges the estimate with recency weight alpha.
+        ema = float(outcomes[0])
+        for outcome in outcomes[1:]:
+            ema = alpha * float(outcome) + (1 - alpha) * ema
         weights.append(
             {
                 "signal": signal,

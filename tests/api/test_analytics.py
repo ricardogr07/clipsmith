@@ -183,9 +183,21 @@ class TestCalibrateEndpoint:
         data = resp.json()
         assert data["run_id"] == run.id
         assert data["alpha"] == 0.3
-        signals = {w["signal"] for w in data["weights"]}
-        assert "chat_density" in signals
-        assert "transcript_hype" in signals
+        weights = {w["signal"]: w for w in data["weights"]}
+        assert "chat_density" in weights
+        assert "transcript_hype" in weights
+
+        # EMA over [True, False] with alpha=0.3:
+        # ema_0 = 1.0, ema_1 = 0.3*0.0 + 0.7*1.0 = 0.7
+        # approval_rate = 0.5 — should differ, proving EMA is not a constant
+        cd = weights["chat_density"]
+        assert cd["approval_rate"] == 0.5
+        assert cd["recommended_weight"] == pytest.approx(0.7, abs=0.01)
+
+        # transcript_hype: only one clip (approved=True), EMA == 1.0 == approval_rate
+        th = weights["transcript_hype"]
+        assert th["approval_rate"] == 1.0
+        assert th["recommended_weight"] == pytest.approx(1.0, abs=0.01)
 
     def test_calibrate_requires_auth(self, client: TestClient, db: Session) -> None:
         run = _create_run(db)
