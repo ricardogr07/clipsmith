@@ -18,8 +18,8 @@ Transform clipsmith from a CLI tool into a **production-grade, full-stack AI con
 | 3 | Reliability | Structured logs, stage checkpoints, LLM retry | ✅ Done |
 | 4 | Publishing + Polish | YouTube Shorts, multi-language, OpenAPI polish | ✅ Done |
 | Security | Hardening | API auth, input validation, path safety, CORS | ✅ Done |
-| 5 | ML Feedback Loop | Signal calibration, prompt A/B, approval analytics | 🔜 Next |
-| 6 | Infrastructure as Code | Terraform modules, Key Vault, ACR | 🔜 Planned |
+| 5 | ML Feedback Loop | Signal calibration, prompt A/B, approval analytics | ✅ Done |
+| 6 | Infrastructure as Code | Terraform modules, Key Vault, ACR | 🔜 Next |
 | 7 | Observability Stack | OpenTelemetry traces, Prometheus metrics, Grafana | 🔜 Planned |
 | 8 | Run Detail UI | Video player, keyboard shortcuts, signal charts | 🔜 Planned |
 | 9 | DB Migrations | Alembic, DATABASE_URL abstraction, PostgreSQL | 🔜 Planned |

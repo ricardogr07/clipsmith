@@ -6,7 +6,7 @@ import re
 from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy.orm import Session
 
 from ..deps import get_db, verify_api_key
@@ -19,6 +19,28 @@ _VOD_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 
 
 class RunCreate(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "vod_id": "2341234567",
+                    "channel": "xqc",
+                    "provider": "anthropic",
+                    "prompt_version": "v1",
+                },
+                {
+                    "summary": "Prompt A/B test with v2",
+                    "value": {
+                        "vod_id": "2341234567",
+                        "channel": "xqc",
+                        "provider": "anthropic",
+                        "prompt_version": "v2",
+                    },
+                },
+            ]
+        }
+    )
+
     vod_id: str
     channel: str = ""
     provider: Literal["anthropic", "openai", "ollama"] | None = None

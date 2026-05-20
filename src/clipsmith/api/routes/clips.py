@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from ..deps import get_db, verify_api_key
@@ -13,6 +13,10 @@ router = APIRouter(tags=["clips"])
 
 
 class ClipPatch(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"approved": True}, {"approved": False}]}
+    )
+
     approved: bool
 
 
