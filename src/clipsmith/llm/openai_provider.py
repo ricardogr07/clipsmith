@@ -11,7 +11,7 @@ import time
 
 from ..models.candidates import CandidateMoment
 from .base import ClipPick
-from .prompts import SYSTEM_PROMPT, build_candidate_prompt
+from .prompts import get_system_prompt, build_candidate_prompt
 from .retry import build_retry, RetryConfig
 
 log = logging.getLogger(__name__)
@@ -19,7 +19,12 @@ log = logging.getLogger(__name__)
 
 class OpenAIProvider:
     def __init__(
-        self, api_key: str, *, model: str = "gpt-4.1", retry_cfg: RetryConfig | None = None
+        self,
+        api_key: str,
+        *,
+        model: str = "gpt-4.1",
+        retry_cfg: RetryConfig | None = None,
+        prompt_version: str = "v1",
     ):
         if not api_key:
             raise ValueError("OPENAI_API_KEY is required for the OpenAI provider")
@@ -30,6 +35,7 @@ class OpenAIProvider:
         self._client = _openai.OpenAI(api_key=api_key)
         self._model = model
         self._retry_cfg = retry_cfg or RetryConfig()
+        self._system_prompt = get_system_prompt(prompt_version)
 
     def pick(
         self,
@@ -50,7 +56,7 @@ class OpenAIProvider:
                         max_tokens=512,
                         response_format={"type": "json_object"},
                         messages=[
-                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "system", "content": self._system_prompt},
                             {"role": "user", "content": stream_context},
                             {
                                 "role": "assistant",

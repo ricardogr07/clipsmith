@@ -24,14 +24,19 @@ log = logging.getLogger(__name__)
 
 
 def start_run(
-    run_id: int, vod_id: str, channel: str, provider: str | None, app: Any = None
+    run_id: int,
+    vod_id: str,
+    channel: str,
+    provider: str | None,
+    app: Any = None,
+    prompt_version: str = "v1",
 ) -> None:
     """Entry point for BackgroundTasks. Opens its own DB session for thread safety."""
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(run_id=run_id, vod_id=vod_id)
     db = get_session()
     try:
-        _run_pipeline(db, run_id, vod_id, channel, provider)
+        _run_pipeline(db, run_id, vod_id, channel, provider, prompt_version=prompt_version)
     except Exception as exc:
         log.exception("pipeline failed for run %d vod=%s", run_id, vod_id)
         try:
@@ -69,7 +74,13 @@ def _emit(
 
 
 def _run_pipeline(
-    db: Session, run_id: int, vod_id: str, channel: str, provider: str | None
+    db: Session,
+    run_id: int,
+    vod_id: str,
+    channel: str,
+    provider: str | None,
+    *,
+    prompt_version: str = "v1",
 ) -> None:
     cfg = load_config(Path("config.yaml"))
     secrets = load_secrets()
@@ -93,7 +104,7 @@ def _run_pipeline(
         _emit(db, run_id, stage, pct)
 
     _emit(db, run_id, "starting", 0.0, "pipeline starting")
-    process_vod(video, cfg, secrets, on_stage=on_stage)
+    process_vod(video, cfg, secrets, on_stage=on_stage, prompt_version=prompt_version)
 
     _harvest_clips(db, run_id, vod_id, cfg)
     _emit(db, run_id, "done", 100.0, "pipeline complete", status=RunStatus.done)
@@ -108,6 +119,7 @@ def _harvest_clips(db: Session, run_id: int, vod_id: str, cfg: AppConfig) -> Non
     picks_data = json.loads(picks_path.read_text(encoding="utf-8"))
     for i, item in enumerate(picks_data, 1):
         p = item.get("pick", {})
+        cand = item.get("candidate", {})
         title = p.get("title_es", "")
         slug = _title_slug(title)
         filename = f"clip_{i:02d}_{slug}.mp4"
@@ -117,10 +129,21 @@ def _harvest_clips(db: Session, run_id: int, vod_id: str, cfg: AppConfig) -> Non
             title=title,
             start_s=p.get("start_offset_s", 0.0),
             end_s=p.get("end_offset_s", 0.0),
-            score=item.get("candidate", {}).get("score", 0.0),
+            score=cand.get("score", 0.0),
+            signal_breakdown=_build_signal_breakdown(cand),
         )
         db.add(clip)
     db.commit()
+
+
+def _build_signal_breakdown(candidate: dict) -> dict[str, float] | None:
+    """Map candidate sources to equal-split score contributions."""
+    sources = candidate.get("sources", [])
+    total = candidate.get("score", 0.0) or 0.0
+    if not sources or total == 0.0:
+        return None
+    per_source = round(total / len(sources), 2)
+    return {src: per_source for src in sources}
 
 
 def _title_slug(title: str) -> str:

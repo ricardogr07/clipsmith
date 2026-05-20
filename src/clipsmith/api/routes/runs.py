@@ -22,6 +22,7 @@ class RunCreate(BaseModel):
     vod_id: str
     channel: str = ""
     provider: Literal["anthropic", "openai", "ollama"] | None = None
+    prompt_version: Literal["v1", "v2"] = "v1"
 
     @field_validator("vod_id")
     @classmethod
@@ -46,13 +47,24 @@ def create_run(
     """
     if request.app.state.active_run_id is not None:
         raise HTTPException(429, "A pipeline run is already in progress")
-    run = Run(vod_id=body.vod_id, channel=body.channel, status=RunStatus.pending)
+    run = Run(
+        vod_id=body.vod_id,
+        channel=body.channel,
+        status=RunStatus.pending,
+        prompt_version=body.prompt_version,
+    )
     db.add(run)
     db.commit()
     db.refresh(run)
     request.app.state.active_run_id = run.id
     background_tasks.add_task(
-        start_run, run.id, body.vod_id, body.channel, body.provider, request.app
+        start_run,
+        run.id,
+        body.vod_id,
+        body.channel,
+        body.provider,
+        request.app,
+        body.prompt_version,
     )
     return run.to_dict()
 

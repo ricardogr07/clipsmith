@@ -7,16 +7,22 @@ import time
 
 from ..models.candidates import CandidateMoment
 from .base import ClipPick
-from .prompts import SYSTEM_PROMPT
+from .prompts import get_system_prompt
 from .retry import build_retry, RetryConfig
 
 log = logging.getLogger(__name__)
 
 
 class OllamaProvider:
-    def __init__(self, model: str = "llama3.1:8b", retry_cfg: RetryConfig | None = None):
+    def __init__(
+        self,
+        model: str = "llama3.1:8b",
+        retry_cfg: RetryConfig | None = None,
+        prompt_version: str = "v1",
+    ):
         self._model = model
         self._retry_cfg = retry_cfg or RetryConfig()
+        self._system_prompt = get_system_prompt(prompt_version)
 
     def pick(
         self,
@@ -48,7 +54,7 @@ class OllamaProvider:
                     resp = ollama.chat(
                         model=self._model,
                         messages=[
-                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "system", "content": self._system_prompt},
                             {"role": "user", "content": user_msg},
                         ],
                         format="json",

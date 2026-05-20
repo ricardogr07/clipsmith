@@ -5,7 +5,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Enum as SAEnum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Enum as SAEnum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -33,6 +33,7 @@ class Run(Base):
     status: Mapped[RunStatus] = mapped_column(SAEnum(RunStatus), default=RunStatus.pending)
     stage: Mapped[str | None] = mapped_column(String(64), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prompt_version: Mapped[str] = mapped_column(String(32), default="v1")
     created_at: Mapped[datetime] = mapped_column(default=_now)
     updated_at: Mapped[datetime] = mapped_column(default=_now, onupdate=_now)
 
@@ -51,6 +52,7 @@ class Run(Base):
             "status": self.status.value,
             "stage": self.stage,
             "error": self.error,
+            "prompt_version": self.prompt_version,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
             "clip_count": len(self.clips),
@@ -69,6 +71,7 @@ class Clip(Base):
     score: Mapped[float] = mapped_column(Float, default=0.0)
     approved: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     published_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    signal_breakdown: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=_now)
 
     run: Mapped[Run] = relationship(back_populates="clips")
@@ -84,6 +87,7 @@ class Clip(Base):
             "score": self.score,
             "approved": self.approved,
             "published_url": self.published_url,
+            "signal_breakdown": self.signal_breakdown,
             "created_at": self.created_at.isoformat(),
         }
 

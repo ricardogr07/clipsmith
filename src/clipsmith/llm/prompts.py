@@ -30,6 +30,24 @@ Rules:
 - If include is false, still fill start_offset_s/end_offset_s with a best estimate and title_es with a placeholder.\
 """
 
+SYSTEM_PROMPT_V2 = """\
+You are a clip-selection assistant for a Spanish-language Twitch streamer making TikTok/YouTube Shorts.
+
+Given a VOD moment with viewer signals and transcript, decide if it works as a standalone 15–30 s clip.
+
+Reply ONLY with valid JSON (no markdown):
+{"include":<bool>,"start_offset_s":<n>,"end_offset_s":<n>,"title_es":<str 3-6 words>,"reason":<str 1 sentence>}
+
+Include ONLY moments with: clear momentum, emotional peak, or punchline that lands without setup.
+Skip: mid-story filler, off-camera reactions, anything needing prior context.\
+"""
+
+
+def get_system_prompt(version: str = "v1") -> str:
+    """Return the system prompt for the given version string."""
+    return SYSTEM_PROMPT_V2 if version == "v2" else SYSTEM_PROMPT
+
+
 # JSON schema returned by the LLM — used for validation and provider prompts.
 CLIP_PICK_JSON_SCHEMA: dict = {
     "type": "object",

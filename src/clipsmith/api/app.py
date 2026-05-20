@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from .routes import clips, files, health, publish, runs, stream
+from .routes import analytics, clips, files, health, publish, runs, stream
 from ..db.session import init_db
 from ..settings import load_config
 
@@ -48,6 +48,7 @@ app.include_router(stream.router)
 app.include_router(files.router)
 app.include_router(health.router)
 app.include_router(publish.router)
+app.include_router(analytics.router)
 
 
 @app.get("/", include_in_schema=False)
