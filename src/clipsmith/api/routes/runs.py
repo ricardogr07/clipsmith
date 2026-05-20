@@ -6,7 +6,7 @@ import re
 from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy.orm import Session
 
 from ..deps import get_db, verify_api_key
@@ -19,9 +19,32 @@ _VOD_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 
 
 class RunCreate(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "vod_id": "2341234567",
+                    "channel": "xqc",
+                    "provider": "anthropic",
+                    "prompt_version": "v1",
+                },
+                {
+                    "summary": "Prompt A/B test with v2",
+                    "value": {
+                        "vod_id": "2341234567",
+                        "channel": "xqc",
+                        "provider": "anthropic",
+                        "prompt_version": "v2",
+                    },
+                },
+            ]
+        }
+    )
+
     vod_id: str
     channel: str = ""
     provider: Literal["anthropic", "openai", "ollama"] | None = None
+    prompt_version: Literal["v1", "v2"] = "v1"
 
     @field_validator("vod_id")
     @classmethod
@@ -46,13 +69,24 @@ def create_run(
     """
     if request.app.state.active_run_id is not None:
         raise HTTPException(429, "A pipeline run is already in progress")
-    run = Run(vod_id=body.vod_id, channel=body.channel, status=RunStatus.pending)
+    run = Run(
+        vod_id=body.vod_id,
+        channel=body.channel,
+        status=RunStatus.pending,
+        prompt_version=body.prompt_version,
+    )
     db.add(run)
     db.commit()
     db.refresh(run)
     request.app.state.active_run_id = run.id
     background_tasks.add_task(
-        start_run, run.id, body.vod_id, body.channel, body.provider, request.app
+        start_run,
+        run.id,
+        body.vod_id,
+        body.channel,
+        body.provider,
+        request.app,
+        body.prompt_version,
     )
     return run.to_dict()
 

@@ -67,6 +67,15 @@ def _reset_active_run() -> Generator[None, None, None]:
     app.state.active_run_id = None
 
 
+@pytest.fixture(autouse=True)
+def _clear_tables() -> Generator[None, None, None]:
+    """Delete all rows from all tables before each test for isolation."""
+    yield
+    with _engine.begin() as conn:
+        for table in reversed(Base.metadata.sorted_tables):
+            conn.execute(table.delete())
+
+
 @pytest.fixture
 def db() -> Generator[Session, None, None]:
     session = _TestSession()

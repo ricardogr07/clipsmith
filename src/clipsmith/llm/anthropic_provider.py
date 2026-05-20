@@ -12,7 +12,7 @@ import time
 
 from ..models.candidates import CandidateMoment
 from .base import ClipPick
-from .prompts import SYSTEM_PROMPT, build_candidate_prompt
+from .prompts import get_system_prompt, build_candidate_prompt
 from .retry import build_retry, RetryConfig
 
 log = logging.getLogger(__name__)
@@ -25,6 +25,7 @@ class AnthropicProvider:
         *,
         model: str = "claude-sonnet-4-6",
         retry_cfg: RetryConfig | None = None,
+        prompt_version: str = "v1",
     ):
         if not api_key:
             raise ValueError("ANTHROPIC_API_KEY is required for the Anthropic provider")
@@ -35,6 +36,7 @@ class AnthropicProvider:
         self._client = _anthropic.Anthropic(api_key=api_key)
         self._model = model
         self._retry_cfg = retry_cfg or RetryConfig()
+        self._system_prompt = get_system_prompt(prompt_version)
 
     def pick(
         self,
@@ -56,7 +58,7 @@ class AnthropicProvider:
                         system=[
                             {
                                 "type": "text",
-                                "text": SYSTEM_PROMPT,
+                                "text": self._system_prompt,
                                 "cache_control": {"type": "ephemeral"},
                             }
                         ],

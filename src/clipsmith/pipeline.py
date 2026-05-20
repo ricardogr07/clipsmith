@@ -54,6 +54,7 @@ def process_vod(
     skip_select: bool = False,
     skip_clip: bool = False,
     provider: str | None = None,
+    prompt_version: str = "v1",
     max_candidates: int = 20,
     start_s: float = 0.0,
     on_stage: Callable[[str, float], None] | None = None,
@@ -199,7 +200,7 @@ def process_vod(
     console.print(
         f"[cyan]selecting clips[/cyan] via {cfg.llm.provider} (top {max_candidates} candidates)..."
     )
-    picker = get_provider(cfg, secrets)
+    picker = get_provider(cfg, secrets, prompt_version=prompt_version)
     stream_context = build_stream_context(
         channel=video.user_login,
         vod_title=video.title,

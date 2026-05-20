@@ -1,0 +1,483 @@
+{
+  "info": {
+    "name": "clipsmith API",
+    "description": "REST API for the clipsmith AI clip pipeline.\n\nImport this collection and set the `base_url` and `api_key` variables in the environment to get started.\n\n**Variables required:**\n- `base_url` — e.g. `http://localhost:8000`\n- `api_key` — value of `CLIPSMITH_API_KEY` on the server (leave blank if auth is disabled)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "clipsmith"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "change-me",
+      "type": "string"
+    },
+    {
+      "key": "run_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "clip_id",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "X-Api-Key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{api_key}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Returns `{\"status\": \"ok\", \"db\": \"ok\", \"version\": \"...\"}`. Used by the CD health gate."
+          },
+          "response": [
+            {
+              "name": "Healthy",
+              "originalRequest": {
+                "method": "GET",
+                "url": { "raw": "{{base_url}}/health" }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\"status\":\"ok\",\"db\":\"ok\",\"version\":\"1.0.0\"}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('status ok', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Run metrics",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/metrics",
+              "host": ["{{base_url}}"],
+              "path": ["metrics"]
+            },
+            "description": "Returns run counts by status (pending / running / done / failed)."
+          },
+          "response": [
+            {
+              "name": "Metrics",
+              "originalRequest": { "method": "GET", "url": { "raw": "{{base_url}}/metrics" } },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\"runs_by_status\":{\"pending\":0,\"running\":0,\"done\":3,\"failed\":1}}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('status 200', () => pm.response.to.have.status(200));"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Runs",
+      "item": [
+        {
+          "name": "List all runs",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/runs",
+              "host": ["{{base_url}}"],
+              "path": ["runs"]
+            },
+            "description": "Returns all runs ordered by creation time descending. No auth required."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get run by ID",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/runs/{{run_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["runs", "{{run_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('status 200 or 404', () => pm.expect([200,404]).to.include(pm.response.code));"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create run (prompt v1)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/runs",
+              "host": ["{{base_url}}"],
+              "path": ["runs"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vod_id\": \"2341234567\",\n  \"channel\": \"xqc\",\n  \"provider\": \"anthropic\",\n  \"prompt_version\": \"v1\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Starts an async pipeline run. Returns 429 if a run is already in progress. Requires `X-Api-Key` when auth is enabled."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (pm.response.code === 201) {",
+                  "  pm.collectionVariables.set('run_id', r.id);",
+                  "  pm.test('run_id set', () => pm.expect(r.id).to.be.a('number'));",
+                  "  pm.test('prompt_version', () => pm.expect(r.prompt_version).to.eql('v1'));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create run (prompt v2 A/B test)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/runs",
+              "host": ["{{base_url}}"],
+              "path": ["runs"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vod_id\": \"2341234568\",\n  \"channel\": \"xqc\",\n  \"provider\": \"anthropic\",\n  \"prompt_version\": \"v2\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Same as above but uses the concise SYSTEM_PROMPT_V2 for the LLM. Compare approval rates with `/analytics/prompts`."
+          }
+        },
+        {
+          "name": "Stream run progress (SSE)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/runs/{{run_id}}/progress",
+              "host": ["{{base_url}}"],
+              "path": ["runs", "{{run_id}}", "progress"]
+            },
+            "description": "Server-Sent Events stream. Each `data:` frame is a JSON `PipelineEvent`. The stream closes when the run reaches `done` or `failed`.\n\nOpen in a browser or use `curl -N` to see live events:\n```bash\ncurl -N http://localhost:8000/runs/1/progress\n```"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Clips",
+      "item": [
+        {
+          "name": "List clips for a run",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/runs/{{run_id}}/clips",
+              "host": ["{{base_url}}"],
+              "path": ["runs", "{{run_id}}", "clips"]
+            },
+            "description": "Returns all clips for the given run. Each clip includes `signal_breakdown` (per-signal score contribution) if the run was created after Sprint 5."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const clips = pm.response.json();",
+                  "  if (clips.length > 0) pm.collectionVariables.set('clip_id', clips[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve clip",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/clips/{{clip_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["clips", "{{clip_id}}"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"approved\": true}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Approve a clip. Use `false` to reject. Approval state feeds into `/analytics/signals` and `/analytics/runs/{id}/calibrate`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('status 200 or 4xx', () => pm.expect([200,401,404]).to.include(pm.response.code));"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject clip",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/clips/{{clip_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["clips", "{{clip_id}}"]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"approved\": false}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Download clip file",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/runs/{{run_id}}/clips/file/clip_01_example.mp4",
+              "host": ["{{base_url}}"],
+              "path": ["runs", "{{run_id}}", "clips", "file", "clip_01_example.mp4"]
+            },
+            "description": "Download the raw MP4 file for a clip. Replace `clip_01_example.mp4` with the `filename` field from the clip record."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Signal stats",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/analytics/signals",
+              "host": ["{{base_url}}"],
+              "path": ["analytics", "signals"]
+            },
+            "description": "Aggregate per-signal approval stats across all clips that have `signal_breakdown` data.\n\nExample response:\n```json\n{\n  \"signals\": [\n    {\n      \"signal\": \"chat_density\",\n      \"clip_count\": 12,\n      \"approved_count\": 8,\n      \"approval_rate\": 0.667,\n      \"total_score\": 450.0\n    }\n  ]\n}\n```"
+          },
+          "response": [
+            {
+              "name": "Signal stats",
+              "originalRequest": { "method": "GET", "url": { "raw": "{{base_url}}/analytics/signals" } },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\"signals\":[{\"signal\":\"audio_energy\",\"clip_count\":3,\"approved_count\":2,\"approval_rate\":0.667,\"total_score\":120.0},{\"signal\":\"chat_density\",\"clip_count\":8,\"approved_count\":5,\"approval_rate\":0.625,\"total_score\":380.5},{\"signal\":\"clip_command\",\"clip_count\":2,\"approved_count\":2,\"approval_rate\":1.0,\"total_score\":95.0},{\"signal\":\"existing_clip\",\"clip_count\":1,\"approved_count\":1,\"approval_rate\":1.0,\"total_score\":50.0},{\"signal\":\"transcript_hype\",\"clip_count\":5,\"approved_count\":2,\"approval_rate\":0.4,\"total_score\":200.0}]}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('has signals key', () => pm.expect(pm.response.json()).to.have.property('signals'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Prompt version comparison",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/analytics/prompts",
+              "host": ["{{base_url}}"],
+              "path": ["analytics", "prompts"]
+            },
+            "description": "Compare clip approval rate between prompt versions (v1 vs v2). Run multiple VODs with `prompt_version: \"v2\"` then compare here to decide whether to promote v2."
+          },
+          "response": [
+            {
+              "name": "Prompt comparison",
+              "originalRequest": { "method": "GET", "url": { "raw": "{{base_url}}/analytics/prompts" } },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\"versions\":[{\"prompt_version\":\"v1\",\"clip_count\":15,\"reviewed_count\":15,\"approved_count\":9,\"approval_rate\":0.6},{\"prompt_version\":\"v2\",\"clip_count\":8,\"reviewed_count\":6,\"approved_count\":5,\"approval_rate\":0.833}]}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('has versions key', () => pm.expect(pm.response.json()).to.have.property('versions'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Calibrate signal weights (EMA)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/analytics/runs/{{run_id}}/calibrate",
+              "host": ["{{base_url}}"],
+              "path": ["analytics", "runs", "{{run_id}}", "calibrate"]
+            },
+            "description": "Returns EMA-adjusted (alpha=0.3) weight recommendations per signal for the given run, based on clip approval outcomes. Read-only — does not modify config.\n\nRequires `X-Api-Key`.\n\nExample response:\n```json\n{\n  \"run_id\": 1,\n  \"alpha\": 0.3,\n  \"weights\": [\n    {\"signal\": \"chat_density\", \"clip_count\": 4, \"approval_rate\": 0.75, \"recommended_weight\": 0.75}\n  ]\n}\n```"
+          },
+          "response": [
+            {
+              "name": "Calibration result",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{base_url}}/analytics/runs/1/calibrate" }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "body": "{\"run_id\":1,\"alpha\":0.3,\"weights\":[{\"signal\":\"chat_density\",\"clip_count\":4,\"approval_rate\":0.75,\"recommended_weight\":0.75},{\"signal\":\"transcript_hype\",\"clip_count\":2,\"approval_rate\":0.5,\"recommended_weight\":0.5}]}"
+            },
+            {
+              "name": "No reviewed clips",
+              "originalRequest": {
+                "method": "POST",
+                "url": { "raw": "{{base_url}}/analytics/runs/1/calibrate" }
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "body": "{\"detail\":\"No reviewed clips with signal data for this run\"}"
+            }
+          ],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200 or 4xx', () => pm.expect([200,401,404,422]).to.include(pm.response.code));",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('has weights', () => pm.expect(pm.response.json().weights).to.be.an('array'));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Publish",
+      "item": [
+        {
+          "name": "Publish clip to YouTube Shorts",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/clips/{{clip_id}}/publish",
+              "host": ["{{base_url}}"],
+              "path": ["clips", "{{clip_id}}", "publish"]
+            },
+            "description": "Upload the clip file to YouTube Shorts and persist the watch URL. Idempotent — calling twice returns the existing URL. Requires the clip to be approved first (otherwise 422)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('status 200 or 4xx', () => pm.expect([200,401,404,422]).to.include(pm.response.code));"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
