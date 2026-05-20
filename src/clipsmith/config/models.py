@@ -102,6 +102,11 @@ class CloudConfig(BaseModel):
     aci_memory_gb: float = 16.0
     docker_image: str = ""
     gpu_sku: str = ""  # e.g. "V100" — empty means CPU-only
+    acr_login_server: str = ""
+    acr_username: str = ""
+    acr_password: str = ""
+    key_vault_uri: str = ""
+    secret_names: list[str] = []
 
 
 class CheckpointConfig(BaseModel):
