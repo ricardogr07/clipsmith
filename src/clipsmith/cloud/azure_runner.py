@@ -20,6 +20,15 @@ _WORK_SHARE = "clipsmith-work"
 _OUT_SHARE = "clipsmith-out"
 
 
+def _resolve_secrets(vault_uri: str, secret_names: list[str]) -> dict[str, str]:
+    """Fetch named secrets from Azure Key Vault at ACI provision time."""
+    from azure.identity import DefaultAzureCredential
+    from azure.keyvault.secrets import SecretClient
+
+    client = SecretClient(vault_url=vault_uri, credential=DefaultAzureCredential())
+    return {name: client.get_secret(name.replace("_", "-")).value or "" for name in secret_names}
+
+
 def _aci_client(secrets: Secrets) -> Any:
     from azure.identity import DefaultAzureCredential
     from azure.mgmt.containerinstance import ContainerInstanceManagementClient
@@ -135,6 +144,10 @@ def create_container_group(
         command=["clipsmith", "run-vod", vod_id, "--config", "/app/work/config.yaml", "-v"],
     )
 
+    if config.cloud.key_vault_uri and config.cloud.secret_names:
+        kv_secrets = _resolve_secrets(config.cloud.key_vault_uri, config.cloud.secret_names)
+        env_vars.extend(EnvironmentVariable(name=k, secure_value=v) for k, v in kv_secrets.items())
+
     registry_creds = None
     if secrets.docker_hub_username and secrets.docker_hub_password:
         registry_creds = [
@@ -142,6 +155,14 @@ def create_container_group(
                 server="index.docker.io",
                 username=secrets.docker_hub_username,
                 password=secrets.docker_hub_password,
+            )
+        ]
+    if config.cloud.acr_login_server and config.cloud.acr_username and config.cloud.acr_password:
+        registry_creds = [
+            ImageRegistryCredential(
+                server=config.cloud.acr_login_server,
+                username=config.cloud.acr_username,
+                password=config.cloud.acr_password,
             )
         ]
 

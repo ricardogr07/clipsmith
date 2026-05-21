@@ -72,6 +72,7 @@ cloud = [
     "azure-mgmt-storage>=21",
     "azure-storage-file-share>=12",
     "azure-identity>=1.16",
+    "azure-keyvault-secrets>=4.8",
     "clipsmith-ai[publish]",
 ]
 
