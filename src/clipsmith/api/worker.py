@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 import unicodedata
 from datetime import datetime, timezone
 from typing import Any
@@ -19,6 +20,7 @@ from ..db.session import get_session
 from ..models.twitch import Video
 from ..pipeline import process_vod
 from ..settings import AppConfig, load_config, load_secrets
+from ..telemetry import CLIPS_APPROVED, RUNS_TOTAL, STAGE_DURATION, stage_duration, tracer  # noqa: F401
 
 log = logging.getLogger(__name__)
 
@@ -37,8 +39,10 @@ def start_run(
     db = get_session()
     try:
         _run_pipeline(db, run_id, vod_id, channel, provider, prompt_version=prompt_version)
+        RUNS_TOTAL.labels(status="done").inc()
     except Exception as exc:
         log.exception("pipeline failed for run %d vod=%s", run_id, vod_id)
+        RUNS_TOTAL.labels(status="failed").inc()
         try:
             run = db.get(Run, run_id)
             if run:
@@ -100,11 +104,35 @@ def _run_pipeline(
         type="archive",
     )
 
+    _stage_start: dict[str, tuple] = {}  # stage → (span, t0)
+
     def on_stage(stage: str, pct: float) -> None:
+        for prev, (span, t0) in list(_stage_start.items()):
+            elapsed = time.monotonic() - t0
+            stage_duration.record(elapsed, {"stage": prev, "vod_id": vod_id})
+            STAGE_DURATION.labels(stage=prev).observe(elapsed)
+            span.end()
+            del _stage_start[prev]
+
+        span = tracer.start_span(
+            f"pipeline.{stage}",
+            attributes={"run_id": str(run_id), "vod_id": vod_id, "stage": stage},
+        )
+        _stage_start[stage] = (span, time.monotonic())
         _emit(db, run_id, stage, pct)
 
     _emit(db, run_id, "starting", 0.0, "pipeline starting")
-    process_vod(video, cfg, secrets, on_stage=on_stage, prompt_version=prompt_version)
+
+    with tracer.start_as_current_span(
+        "pipeline.run", attributes={"run_id": str(run_id), "vod_id": vod_id}
+    ):
+        process_vod(video, cfg, secrets, on_stage=on_stage, prompt_version=prompt_version)
+
+    for stage, (span, t0) in list(_stage_start.items()):
+        elapsed = time.monotonic() - t0
+        stage_duration.record(elapsed, {"stage": stage, "vod_id": vod_id})
+        STAGE_DURATION.labels(stage=stage).observe(elapsed)
+        span.end()
 
     _harvest_clips(db, run_id, vod_id, cfg)
     _emit(db, run_id, "done", 100.0, "pipeline complete", status=RunStatus.done)

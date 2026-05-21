@@ -19,8 +19,8 @@ Transform clipsmith from a CLI tool into a **production-grade, full-stack AI con
 | 4 | Publishing + Polish | YouTube Shorts, multi-language, OpenAPI polish | ✅ Done |
 | Security | Hardening | API auth, input validation, path safety, CORS | ✅ Done |
 | 5 | ML Feedback Loop | Signal calibration, prompt A/B, approval analytics | ✅ Done |
-| 6 | Infrastructure as Code | Terraform modules, Key Vault, ACR | 🔜 Next |
-| 7 | Observability Stack | OpenTelemetry traces, Prometheus metrics, Grafana | 🔜 Planned |
+| 6 | Infrastructure as Code | Terraform modules, Key Vault, ACR | ✅ Done |
+| 7 | Observability Stack | OpenTelemetry traces, Prometheus metrics, Grafana | 🚧 In Progress |
 | 8 | Run Detail UI | Video player, keyboard shortcuts, signal charts | 🔜 Planned |
 | 9 | DB Migrations | Alembic, DATABASE_URL abstraction, PostgreSQL | 🔜 Planned |
 | 10 | Continuous Deployment | deploy.yml, ACI update, health-check gate | 🔜 Planned |
@@ -106,7 +106,7 @@ Transform clipsmith from a CLI tool into a **production-grade, full-stack AI con
 - Key Vault secret references injected into ACI env at container-create time
 - `terraform fmt -check` + `terraform validate` added to CI lint job
 
-**See:** [sprint6.md](sprint6.md) · **Status:** 🔜 Planned
+**See:** [sprint6.md](sprint6.md) · **Status:** ✅ Done
 
 ---
 
@@ -121,7 +121,7 @@ Transform clipsmith from a CLI tool into a **production-grade, full-stack AI con
 - `infra/grafana/clipsmith-dashboard.json` — importable Grafana dashboard
 - Azure Monitor / Application Insights OTLP export for production
 
-**See:** [sprint7.md](sprint7.md) · **Status:** 🔜 Planned
+**See:** [sprint7.md](sprint7.md) · **Status:** 🚧 In Progress
 
 ---
 

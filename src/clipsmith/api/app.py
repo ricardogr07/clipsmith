@@ -14,6 +14,7 @@ from fastapi.responses import RedirectResponse
 from .routes import analytics, clips, files, health, publish, runs, stream
 from ..db.session import init_db
 from ..settings import load_config
+from ..telemetry import tracer  # noqa: F401 — side-effect: initialises OTel SDK
 
 
 @asynccontextmanager
@@ -23,6 +24,12 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     init_db(db_path)
     app.state.active_run_id = None  # int | None; cleared by worker on completion
+    try:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+        FastAPIInstrumentor.instrument_app(app)
+    except ImportError:
+        pass
     yield
 
 

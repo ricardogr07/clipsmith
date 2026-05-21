@@ -6,6 +6,7 @@ import logging
 import time
 
 from ..models.candidates import CandidateMoment
+from ..telemetry import LLM_CALL_DURATION, llm_call_duration, llm_calls_total, tracer
 from .base import ClipPick
 from .prompts import get_system_prompt
 from .retry import build_retry, RetryConfig
@@ -46,33 +47,43 @@ class OllamaProvider:
             f"Transcript window:\n{transcript_window}"
         )
         t0 = time.monotonic()
-        try:
-            retry = build_retry(self._retry_cfg, candidate_id=candidate_id, provider="ollama")
-            resp = None
-            for attempt in retry:
-                with attempt:
-                    resp = ollama.chat(
-                        model=self._model,
-                        messages=[
-                            {"role": "system", "content": self._system_prompt},
-                            {"role": "user", "content": user_msg},
-                        ],
-                        format="json",
-                    )
-            assert resp is not None
-            pick = ClipPick.from_json(resp.message.content or "")
-            log.info(
-                "llm_pick provider=ollama candidate=%s include=%s elapsed_ms=%d",
-                candidate_id,
-                pick.include,
-                round((time.monotonic() - t0) * 1000),
-            )
-            return pick
-        except Exception as exc:
-            log.warning(
-                "llm_failed provider=ollama candidate=%s attempts=%d error=%s",
-                candidate_id,
-                self._retry_cfg.max_attempts,
-                exc,
-            )
-            return None
+        with tracer.start_as_current_span(
+            "llm.call",
+            attributes={"provider": "ollama", "model": self._model, "candidate_id": candidate_id},
+        ):
+            try:
+                retry = build_retry(self._retry_cfg, candidate_id=candidate_id, provider="ollama")
+                resp = None
+                for attempt in retry:
+                    with attempt:
+                        resp = ollama.chat(
+                            model=self._model,
+                            messages=[
+                                {"role": "system", "content": self._system_prompt},
+                                {"role": "user", "content": user_msg},
+                            ],
+                            format="json",
+                        )
+                assert resp is not None
+                pick = ClipPick.from_json(resp.message.content or "")
+                elapsed = time.monotonic() - t0
+                llm_call_duration.record(elapsed, {"provider": "ollama"})
+                LLM_CALL_DURATION.labels(provider="ollama").observe(elapsed)
+                llm_calls_total.add(
+                    1, {"provider": "ollama", "outcome": "include" if pick.include else "skip"}
+                )
+                log.info(
+                    "llm_pick provider=ollama candidate=%s include=%s elapsed_ms=%d",
+                    candidate_id,
+                    pick.include,
+                    round(elapsed * 1000),
+                )
+                return pick
+            except Exception as exc:
+                log.warning(
+                    "llm_failed provider=ollama candidate=%s attempts=%d error=%s",
+                    candidate_id,
+                    self._retry_cfg.max_attempts,
+                    exc,
+                )
+                return None

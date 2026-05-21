@@ -6,9 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Python Backend
 ```bash
-pip install -e ".[dev]"            # Install with dev extras
-pip install -e ".[vision]"         # Optional: OpenCV for webcam detection
-pip install -e ".[server]"         # FastAPI + uvicorn
+pip install -e ".[dev]"                        # Install with dev extras
+pip install -e ".[vision]"                     # Optional: OpenCV for webcam detection
+pip install -e ".[server]"                     # FastAPI + uvicorn
+pip install -e ".[dev,server,observability]"   # Full stack incl. OTel + Prometheus
 
 clipsmith serve                    # Start FastAPI server
 clipsmith process path/to/video.mp4
@@ -77,16 +78,18 @@ tests/                 unit / integration / smoke / e2e
 | `db/` | SQLAlchemy ORM: `Run`, `Clip`, `PipelineEvent` (SQLite) |
 | `cloud/` | Azure Container Instances lifecycle + Google Drive upload |
 | `publish/` | YouTube OAuth2 upload |
+| `telemetry.py` | OTel tracer/meter init + Prometheus instruments; no-op fallbacks when `[observability]` not installed |
 
 ### FastAPI API (`src/clipsmith/api/`)
 
-- `app.py` — App factory with lifespan (config load, DB init), CORS
+- `app.py` — App factory with lifespan (config load, DB init, OTel FastAPI instrumentation), CORS
 - `routes/runs.py` — POST /runs (validates `vod_id` regex), GET list/detail
-- `routes/clips.py` — GET clips per run, PATCH approve/title
+- `routes/clips.py` — GET clips per run, PATCH approve/title (increments CLIPS_APPROVED/REJECTED)
 - `routes/stream.py` — SSE progress stream (`/runs/{id}/progress`)
 - `routes/files.py` — Clip file downloads
+- `routes/health.py` — GET /health, GET /metrics (Prometheus scrape), GET /stats (JSON run counts)
 - `deps.py` — `get_db()` session, `verify_api_key()` header check
-- `worker.py` — `BackgroundTasks` runner; `app.state.active_run_id` prevents concurrent runs
+- `worker.py` — `BackgroundTasks` runner; OTel stage spans + STAGE_DURATION histogram; RUNS_TOTAL counter
 
 ### Next.js Dashboard (`web/`)
 
@@ -111,6 +114,31 @@ Tests use four pytest markers gating test scope:
 ### Configuration
 
 `config.yaml` controls runtime behavior (clip bounds, LLM provider/model, transcription model, candidate weights, caption/reframe settings). `load_config()` reads YAML; `load_secrets()` reads `.env` via pydantic-settings. Copy `.env.example` → `.env` to set API keys.
+
+### Observability Stack
+
+`src/clipsmith/telemetry.py` is the single init point. Import it once (side-effect) at server startup — `api/app.py` does this via `from ..telemetry import tracer`.
+
+| Instrument | Type | Labels |
+|-----------|------|--------|
+| `clipsmith_runs_total` | Prometheus Counter | `status` (done/failed) |
+| `clipsmith_clips_approved_total` | Prometheus Counter | — |
+| `clipsmith_clips_rejected_total` | Prometheus Counter | — |
+| `clipsmith_stage_duration_seconds` | Prometheus Histogram | `stage` |
+| `clipsmith_llm_call_duration_seconds` | Prometheus Histogram | `provider` |
+| `clipsmith.llm.calls_total` | OTel Counter | `provider`, `outcome` |
+| `clipsmith.llm.call_duration_seconds` | OTel Histogram | `provider` |
+
+Local dev stack (Prometheus + Grafana + Jaeger):
+```bash
+docker compose -f docker-compose.observability.yml up -d
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 clipsmith serve
+# Prometheus: http://localhost:9090
+# Jaeger:     http://localhost:16686
+# Grafana:    http://localhost:3001  (admin / $GRAFANA_ADMIN_PASSWORD, default: admin)
+```
+
+Production: set `APPLICATIONINSIGHTS_CONNECTION_STRING` to forward traces to Azure Monitor.
 
 ### CI Pipeline
 
