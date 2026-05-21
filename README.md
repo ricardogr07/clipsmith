@@ -212,10 +212,49 @@ clipper         (ffmpeg + libass)          → out/<id>/clip_NN_<title>.mp4
 reframe         (ffmpeg filter_complex)    → out/<id>/stacked/clip_NN_<title>.mp4
 ```
 
+## REST API & Dashboard
+
+Start the FastAPI server and the Next.js dashboard to review and approve clips in a browser:
+
+```sh
+pip install -e ".[server]"
+clipsmith serve                   # http://localhost:8000/docs
+cd web && pnpm install && pnpm dev  # http://localhost:3000
+```
+
+Key API endpoints:
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /runs` | Start a pipeline run (requires `X-Api-Key` header) |
+| `GET /runs/{id}/progress` | SSE stream of live stage progress |
+| `PATCH /clips/{id}` | Approve or reject a clip |
+| `GET /metrics` | Prometheus scrape endpoint |
+| `GET /stats` | Run counts by status (JSON) |
+
+## Observability
+
+Sprint 7 adds distributed tracing (OpenTelemetry → Jaeger), Prometheus metrics, and a
+Grafana dashboard. Spin up the full local stack in one command:
+
+```sh
+pip install -e ".[observability]"
+docker compose -f docker-compose.observability.yml up -d
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 clipsmith serve
+```
+
+| UI | URL |
+|----|-----|
+| Grafana dashboard | http://localhost:3001 (admin / `$GRAFANA_ADMIN_PASSWORD`, default: admin) |
+| Jaeger traces | http://localhost:16686 |
+| Prometheus | http://localhost:9090 |
+
+In production, set `APPLICATIONINSIGHTS_CONNECTION_STRING` to export traces to Azure Monitor Application Insights.
+
 ## Development
 
 ```sh
-pip install -e ".[dev]"
+pip install -e ".[dev,server,observability]"
 pip install -e ".[vision]"   # optional, for detect-webcam tests
 python -m pytest tests -q
 ```

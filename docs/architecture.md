@@ -186,6 +186,11 @@ src/clipsmith/
 │   ├── azure_runner.py         ACI lifecycle: provision, poll, download, teardown
 │   └── drive_upload.py         Google Drive OAuth2: folder creation, clip upload
 │
+├── telemetry.py                OTel tracer/meter init + shared Prometheus instruments
+│                               No-op fallbacks when [observability] not installed
+│                               Exports: tracer, stage_duration, llm_call_duration,
+│                               RUNS_TOTAL, CLIPS_APPROVED, CLIPS_REJECTED, STAGE_DURATION
+│
 └── settings.py                 Re-export shim — backward compat for existing importers
 ```
 
@@ -285,6 +290,65 @@ clipsmith/
             ├── clip_01_<title>.mp4
             └── ...
 ```
+
+---
+
+## Observability
+
+Sprint 7 added three-pillar observability on top of the structured logs from Sprint 3.
+
+### Telemetry module (`telemetry.py`)
+
+Single import at server startup initialises both OTel and Prometheus. All instruments are
+defined here so worker, route, and LLM provider modules can import them without coupling
+to route internals or risking circular imports. When the `[observability]` extra is not
+installed the module falls back to no-op stubs transparently.
+
+### Trace topology (Jaeger)
+
+```
+pipeline.run  [root span — wraps entire process_vod call]
+  ├── pipeline.download
+  ├── pipeline.transcribe
+  ├── pipeline.chat
+  ├── pipeline.candidates
+  └── pipeline.selection
+        ├── llm.call  {provider=anthropic, model=..., candidate_id=...}
+        ├── llm.call
+        └── ...
+```
+
+FastAPI HTTP requests are auto-instrumented as root spans by `FastAPIInstrumentor`.
+
+### Metrics (Prometheus / Grafana)
+
+| Metric | Type | Labels | Source |
+|--------|------|--------|--------|
+| `clipsmith_runs_total` | Counter | `status` | `worker.py` on run complete |
+| `clipsmith_clips_approved_total` | Counter | — | `clips.py` on PATCH approve |
+| `clipsmith_clips_rejected_total` | Counter | — | `clips.py` on PATCH reject |
+| `clipsmith_stage_duration_seconds` | Histogram | `stage` | `worker.py` per stage |
+
+`GET /metrics` returns Prometheus text format for scraping. `GET /stats` returns the same
+counts as JSON.
+
+### Local dev stack
+
+```bash
+docker compose -f docker-compose.observability.yml up -d
+```
+
+| Service | URL | Purpose |
+|---------|-----|---------|
+| Prometheus | http://localhost:9090 | Scrapes `host.docker.internal:8000/metrics` |
+| Grafana | http://localhost:3001 | Pre-built dashboard (admin / `$GRAFANA_ADMIN_PASSWORD`, default: admin) |
+| Jaeger | http://localhost:16686 | Distributed trace viewer |
+| OTLP Collector | :4317 | Receives traces from clipsmith; forwards to Jaeger |
+
+### Production (Azure Monitor)
+
+Set `APPLICATIONINSIGHTS_CONNECTION_STRING` in the ACI environment (sourced from Key Vault
+via Terraform) to have traces forwarded to Application Insights automatically.
 
 ---
 

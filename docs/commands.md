@@ -4,6 +4,33 @@ All commands share the global `--help` flag. Run `clipsmith --help` for the full
 
 ---
 
+## `clipsmith serve`
+
+Start the FastAPI REST API server (requires `pip install -e ".[server]"`).
+
+```sh
+clipsmith serve [--host HOST] [--port PORT] [--reload]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--host` | Bind address (default: `0.0.0.0`) |
+| `--port` | Port number (default: `8000`) |
+| `--reload` | Auto-reload on code changes (development only) |
+
+The server exposes:
+- `GET /health` — DB + server health
+- `GET /metrics` — Prometheus scrape endpoint (text format)
+- `GET /stats` — Run counts by status (JSON)
+- `POST /runs` — Start a pipeline run
+- `GET /runs`, `GET /runs/{id}` — List / inspect runs
+- `GET /runs/{id}/clips` — Clips for a run
+- `PATCH /clips/{id}` — Approve or reject a clip
+- `GET /runs/{id}/progress` — SSE progress stream
+- Full API docs at `http://localhost:8000/docs`
+
+---
+
 ## `clipsmith setup`
 
 First-run wizard: configure LLM provider, save API key, verify ffmpeg.
