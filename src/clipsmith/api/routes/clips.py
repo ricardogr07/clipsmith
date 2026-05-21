@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..deps import get_db, verify_api_key
 from ...db.models import Clip, Run
+from ...telemetry import CLIPS_APPROVED, CLIPS_REJECTED
 
 router = APIRouter(tags=["clips"])
 
@@ -40,4 +41,8 @@ def patch_clip(clip_id: int, body: ClipPatch, db: Session = Depends(get_db)) -> 
     clip.approved = body.approved
     db.commit()
     db.refresh(clip)
+    if body.approved:
+        CLIPS_APPROVED.inc()
+    else:
+        CLIPS_REJECTED.inc()
     return clip.to_dict()
