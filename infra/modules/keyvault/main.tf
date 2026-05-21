@@ -21,7 +21,10 @@ resource "azurerm_key_vault" "main" {
 }
 
 resource "azurerm_key_vault_secret" "secrets" {
-  for_each     = var.secrets
+  # nonsensitive() strips the map's sensitive marker so for_each can use
+  # secret names as resource addresses; each.value is still sensitive at
+  # the azurerm_key_vault_secret level and won't appear in plan output.
+  for_each     = nonsensitive(var.secrets)
   name         = replace(each.key, "_", "-")
   value        = each.value
   key_vault_id = azurerm_key_vault.main.id
