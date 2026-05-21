@@ -20,8 +20,8 @@ Transform clipsmith from a CLI tool into a **production-grade, full-stack AI con
 | Security | Hardening | API auth, input validation, path safety, CORS | ✅ Done |
 | 5 | ML Feedback Loop | Signal calibration, prompt A/B, approval analytics | ✅ Done |
 | 6 | Infrastructure as Code | Terraform modules, Key Vault, ACR | ✅ Done |
-| 7 | Observability Stack | OpenTelemetry traces, Prometheus metrics, Grafana | 🚧 In Progress |
-| 8 | Run Detail UI | Video player, keyboard shortcuts, signal charts | 🔜 Planned |
+| 7 | Observability Stack | OpenTelemetry traces, Prometheus metrics, Grafana | ✅ Done |
+| 8 | Run Detail UI | Video player, keyboard shortcuts, signal charts | 🚧 In Progress |
 | 9 | DB Migrations | Alembic, DATABASE_URL abstraction, PostgreSQL | 🔜 Planned |
 | 10 | Continuous Deployment | deploy.yml, ACI update, health-check gate | 🔜 Planned |
 
@@ -121,7 +121,7 @@ Transform clipsmith from a CLI tool into a **production-grade, full-stack AI con
 - `infra/grafana/clipsmith-dashboard.json` — importable Grafana dashboard
 - Azure Monitor / Application Insights OTLP export for production
 
-**See:** [sprint7.md](sprint7.md) · **Status:** 🚧 In Progress
+**See:** [sprint7.md](sprint7.md) · **Status:** ✅ Done
 
 ---
 
@@ -136,7 +136,7 @@ Transform clipsmith from a CLI tool into a **production-grade, full-stack AI con
 - Keyboard navigation: arrow keys to select clip, J = approve, K = reject, Space = play/pause
 - Signal breakdown bar chart per clip (uses `signal_breakdown` from Sprint 5)
 
-**See:** [sprint8.md](sprint8.md) · **Status:** 🔜 Planned
+**See:** [sprint8.md](sprint8.md) · **Status:** 🚧 In Progress
 
 ---
 

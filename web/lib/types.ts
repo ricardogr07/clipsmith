@@ -7,6 +7,7 @@ export interface Run {
   status: RunStatus;
   stage: string | null;
   error: string | null;
+  prompt_version: string;
   created_at: string;
   updated_at: string;
   clip_count: number;
@@ -21,6 +22,8 @@ export interface Clip {
   end_s: number;
   score: number;
   approved: boolean | null;
+  published_url: string | null;
+  signal_breakdown: Record<string, number> | null;
   created_at: string;
 }
 
