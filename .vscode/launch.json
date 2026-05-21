@@ -1,0 +1,164 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    // ── FastAPI ────────────────────────────────────────────────────────────
+    {
+      "name": "FastAPI: debug server",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "clipsmith.api.app:app",
+        "--host", "0.0.0.0",
+        "--port", "8000",
+        "--reload"
+      ],
+      "justMyCode": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "presentation": {
+        "group": "server",
+        "order": 1
+      }
+    },
+    // ── Python — tox ──────────────────────────────────────────────────────
+    {
+      "name": "Python: tox (lint + type + test + api)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "tox",
+      "cwd": "${workspaceFolder}",
+      "presentation": {
+        "group": "python",
+        "order": 1
+      }
+    },
+    {
+      "name": "Python: tox test",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "tox -e test",
+      "cwd": "${workspaceFolder}",
+      "presentation": {
+        "group": "python",
+        "order": 2
+      }
+    },
+    {
+      "name": "Python: tox api",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "tox -e api",
+      "cwd": "${workspaceFolder}",
+      "presentation": {
+        "group": "python",
+        "order": 3
+      }
+    },
+    {
+      "name": "Python: tox lint + type",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "tox -e lint,type",
+      "cwd": "${workspaceFolder}",
+      "presentation": {
+        "group": "python",
+        "order": 4
+      }
+    },
+    // ── Python — debugger (breakpoints) ───────────────────────────────────
+    {
+      "name": "Python: debug current test file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-v", "-s"],
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}",
+      "presentation": {
+        "group": "python",
+        "order": 5
+      }
+    },
+    // ── Next.js ────────────────────────────────────────────────────────────
+    {
+      "name": "Next.js: dev server",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm dev",
+      "cwd": "${workspaceFolder}/web",
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "- Local:",
+        "uriFormat": "http://localhost:3000"
+      },
+      "presentation": {
+        "group": "server",
+        "order": 2
+      }
+    },
+    {
+      "name": "Next.js: tox typecheck",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "tox -e web-typecheck",
+      "cwd": "${workspaceFolder}",
+      "presentation": {
+        "group": "test",
+        "order": 1
+      }
+    },
+    {
+      "name": "Next.js: tox build",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "tox -e web-build",
+      "cwd": "${workspaceFolder}",
+      "presentation": {
+        "group": "test",
+        "order": 2
+      }
+    },
+    // ── Cypress ────────────────────────────────────────────────────────────
+    {
+      "name": "Cypress: open (interactive)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm cy:open",
+      "cwd": "${workspaceFolder}/web",
+      "presentation": {
+        "group": "test",
+        "order": 3
+      }
+    },
+    // ── Storybook ──────────────────────────────────────────────────────────
+    {
+      "name": "Storybook: dev",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm storybook",
+      "cwd": "${workspaceFolder}/web",
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "Local:",
+        "uriFormat": "http://localhost:6006"
+      },
+      "presentation": {
+        "group": "server",
+        "order": 3
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full stack: FastAPI + Next.js",
+      "configurations": ["FastAPI: debug server", "Next.js: dev server"],
+      "stopAll": true,
+      "presentation": {
+        "group": "server",
+        "order": 0
+      }
+    }
+  ]
+}
