@@ -157,7 +157,7 @@ def create_container_group(
                 password=secrets.docker_hub_password,
             )
         ]
-    if config.cloud.acr_login_server:
+    if config.cloud.acr_login_server and config.cloud.acr_username and config.cloud.acr_password:
         registry_creds = [
             ImageRegistryCredential(
                 server=config.cloud.acr_login_server,

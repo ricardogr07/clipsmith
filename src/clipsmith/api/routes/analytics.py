@@ -89,7 +89,10 @@ def calibrate_run(run_id: int, db: Session = Depends(get_db)) -> dict:
     if not run:
         raise HTTPException(404, "Run not found")
 
-    clips = [c for c in run.clips if c.signal_breakdown and c.approved is not None]
+    clips = sorted(
+        (c for c in run.clips if c.signal_breakdown and c.approved is not None),
+        key=lambda c: c.id,
+    )
     if not clips:
         raise HTTPException(422, "No reviewed clips with signal data for this run")
 
