@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +21,11 @@ export function ClipCard({ clip: initialClip, focused = false, onUpdate, onFocus
   const [clip, setClip] = useState(initialClip);
   const [showModal, setShowModal] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
+
+  // Sync local state when parent updates the clip (e.g. via keyboard shortcuts)
+  useEffect(() => {
+    setClip(initialClip);
+  }, [initialClip]);
 
   function handleUpdate(updated: Clip) {
     setClip(updated);
