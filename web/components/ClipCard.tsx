@@ -1,23 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ClipModal } from "@/components/ClipModal";
 import { ClipMoreOptions } from "@/components/ClipMoreOptions";
+import { SignalBreakdownBar } from "@/components/SignalBreakdownBar";
 import { api } from "@/lib/api";
 import type { Clip } from "@/lib/types";
 
 interface Props {
   clip: Clip;
+  focused?: boolean;
   onUpdate: (updated: Clip) => void;
+  onFocus?: () => void;
 }
 
-export function ClipCard({ clip: initialClip, onUpdate }: Props) {
+export function ClipCard({ clip: initialClip, focused = false, onUpdate, onFocus }: Props) {
   const [clip, setClip] = useState(initialClip);
   const [showModal, setShowModal] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
+
+  // Sync local state when parent updates the clip (e.g. via keyboard shortcuts)
+  useEffect(() => {
+    setClip(initialClip);
+  }, [initialClip]);
 
   function handleUpdate(updated: Clip) {
     setClip(updated);
@@ -33,12 +41,23 @@ export function ClipCard({ clip: initialClip, onUpdate }: Props) {
     }
   }
 
+  const focusRing = focused ? "ring-2 ring-blue-500" : "";
+  const approvalRing =
+    clip.approved === true
+      ? "ring-2 ring-green-500"
+      : clip.approved === false
+        ? "ring-2 ring-red-500"
+        : "";
+
   return (
     <>
-      <Card className="overflow-hidden">
+      <Card
+        className={`overflow-hidden cursor-pointer transition-all ${focusRing || approvalRing}`}
+        onClick={onFocus}
+      >
         {/* Thumbnail / preview area */}
         <button
-          onClick={() => setShowModal(true)}
+          onClick={(e) => { e.stopPropagation(); setShowModal(true); }}
           className="w-full aspect-video bg-muted flex items-center justify-center group hover:bg-muted/80 transition-colors"
           aria-label={`Play ${clip.title || clip.filename}`}
         >
@@ -56,11 +75,15 @@ export function ClipCard({ clip: initialClip, onUpdate }: Props) {
             {clip.approved === false && <Badge variant="destructive">Rejected</Badge>}
           </div>
 
+          {clip.signal_breakdown && (
+            <SignalBreakdownBar breakdown={clip.signal_breakdown} />
+          )}
+
           <div className="flex gap-2">
             <Button
               size="sm"
               variant={clip.approved === true ? "default" : "outline"}
-              onClick={() => handleApprove(true)}
+              onClick={(e) => { e.stopPropagation(); handleApprove(true); }}
               className="flex-1 text-xs"
             >
               Approve
@@ -68,7 +91,7 @@ export function ClipCard({ clip: initialClip, onUpdate }: Props) {
             <Button
               size="sm"
               variant={clip.approved === false ? "destructive" : "outline"}
-              onClick={() => handleApprove(false)}
+              onClick={(e) => { e.stopPropagation(); handleApprove(false); }}
               className="flex-1 text-xs"
             >
               Reject
@@ -76,7 +99,7 @@ export function ClipCard({ clip: initialClip, onUpdate }: Props) {
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => setShowOptions((v) => !v)}
+              onClick={(e) => { e.stopPropagation(); setShowOptions((v) => !v); }}
               className="px-2 text-xs"
               title="More options"
             >
