@@ -2,50 +2,45 @@
 
 from __future__ import annotations
 
-import logging
+import os
 from pathlib import Path
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from .models import Base
 
-log = logging.getLogger(__name__)
-
 _engine: Engine | None = None
 _SessionLocal: sessionmaker | None = None  # type: ignore[type-arg]
 
-# Inline schema migrations for columns added after the initial DB was created.
-# Remove each entry once Sprint 9 (Alembic) is in place and the migration is
-# handled there instead.
-_COLUMN_MIGRATIONS = [
-    ("runs", "prompt_version", "VARCHAR(32) NOT NULL DEFAULT 'v1'"),
-    ("clips", "signal_breakdown", "JSON"),
-]
+
+def _default_url() -> str:
+    return f"sqlite:///{Path('work/clipsmith.db').resolve()}"
 
 
-def _apply_column_migrations(engine: Engine) -> None:
-    """Add columns to existing tables that pre-date the current model."""
-    with engine.begin() as conn:
-        for table, column, definition in _COLUMN_MIGRATIONS:
-            try:
-                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
-                log.info("schema migration: added %s.%s", table, column)
-            except Exception:
-                pass  # column already exists — SQLite raises OperationalError
+def get_database_url() -> str:
+    return os.getenv("DATABASE_URL", _default_url())
 
 
-def init_db(db_path: Path | str = "clipsmith.db") -> None:
-    """Create engine, run DDL (create tables if missing), store session factory."""
+def init_db(db_path: Path | str | None = None) -> None:
+    """Create engine, run DDL, store session factory.
+
+    DATABASE_URL env var takes precedence over db_path for flexibility in
+    production (PostgreSQL) while keeping backward-compat with existing callers.
+    """
     global _engine, _SessionLocal
-    _engine = create_engine(
-        f"sqlite:///{db_path}",
-        connect_args={"check_same_thread": False},
-    )
+
+    url = os.getenv("DATABASE_URL")
+    if url is None and db_path is not None:
+        url = f"sqlite:///{db_path}"
+    if url is None:
+        url = _default_url()
+
+    connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
+    _engine = create_engine(url, connect_args=connect_args)
     _SessionLocal = sessionmaker(bind=_engine, autocommit=False, autoflush=False)
-    Base.metadata.create_all(_engine)  # no-op for tables that already exist
-    _apply_column_migrations(_engine)  # add new columns to pre-existing tables
+    Base.metadata.create_all(_engine)
 
 
 def get_session() -> Session:

@@ -50,6 +50,8 @@ dev = [
     "pip-audit>=2.7",
     "mkdocs>=1.6",
     "mkdocs-material>=9.5",
+    "alembic>=1.13",
+    "psycopg2-binary>=2.9",
 ]
 server = [
     "fastapi>=0.111",
