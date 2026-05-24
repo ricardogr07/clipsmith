@@ -57,6 +57,8 @@ server = [
     "fastapi>=0.111",
     "uvicorn[standard]>=0.30",
     "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg2-binary>=2.9",
 ]
 vision = [
     "opencv-python-headless>=4.9",
