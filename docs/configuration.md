@@ -209,3 +209,43 @@ cloud:
 | `gpu_sku` | Optional NVIDIA GPU model — requires quota increase from Azure |
 
 Storage accounts and file shares are provisioned automatically per run and torn down on completion. No manual storage setup is required. The `cloud` section is only used by `clipsmith cloud` commands — local `run-vod` and `process` ignore it.
+
+---
+
+## Database
+
+clipsmith uses SQLite by default (stored at `work/clipsmith.db`). To use PostgreSQL in
+production, set `DATABASE_URL` before starting the server or running migrations:
+
+```bash
+# SQLite (default — no configuration needed)
+clipsmith serve
+
+# PostgreSQL
+export DATABASE_URL="postgresql+psycopg2://user:pass@host:5432/clipsmith"
+alembic upgrade head   # run once per environment, then:
+clipsmith serve
+```
+
+`DATABASE_URL` follows the [SQLAlchemy engine URL format](https://docs.sqlalchemy.org/en/20/core/engines.html).
+
+### Applying migrations
+
+Run once on a fresh environment, or after pulling new migrations from source control:
+
+```bash
+alembic upgrade head
+```
+
+### Adding schema changes
+
+Never edit the database directly. Always create a migration:
+
+```bash
+# 1. Edit src/clipsmith/db/models.py
+# 2. Generate the migration:
+alembic revision --autogenerate -m "add my_column to clips"
+# 3. Review the generated file under alembic/versions/
+# 4. Apply:
+alembic upgrade head
+```

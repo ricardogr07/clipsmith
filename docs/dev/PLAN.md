@@ -21,8 +21,8 @@ Transform clipsmith from a CLI tool into a **production-grade, full-stack AI con
 | 5 | ML Feedback Loop | Signal calibration, prompt A/B, approval analytics | ✅ Done |
 | 6 | Infrastructure as Code | Terraform modules, Key Vault, ACR | ✅ Done |
 | 7 | Observability Stack | OpenTelemetry traces, Prometheus metrics, Grafana | ✅ Done |
-| 8 | Run Detail UI | Video player, keyboard shortcuts, signal charts | 🚧 In Progress |
-| 9 | DB Migrations | Alembic, DATABASE_URL abstraction, PostgreSQL | 🔜 Planned |
+| 8 | Run Detail UI | Video player, keyboard shortcuts, signal charts | ✅ Done |
+| 9 | DB Migrations | Alembic, DATABASE_URL abstraction, PostgreSQL | 🚧 In Progress |
 | 10 | Continuous Deployment | deploy.yml, ACI update, health-check gate | 🔜 Planned |
 
 ---

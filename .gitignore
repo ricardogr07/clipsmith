@@ -17,6 +17,8 @@ build/
 site/
 *.egg-info/
 
+*.db
+
 # Pipeline artifacts
 out/
 work/

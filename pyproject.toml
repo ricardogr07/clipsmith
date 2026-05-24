@@ -50,11 +50,15 @@ dev = [
     "pip-audit>=2.7",
     "mkdocs>=1.6",
     "mkdocs-material>=9.5",
+    "alembic>=1.13",
+    "psycopg2-binary>=2.9",
 ]
 server = [
     "fastapi>=0.111",
     "uvicorn[standard]>=0.30",
     "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg2-binary>=2.9",
 ]
 vision = [
     "opencv-python-headless>=4.9",

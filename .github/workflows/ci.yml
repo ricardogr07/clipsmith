@@ -32,6 +32,10 @@ jobs:
           python-version: "3.11"
       - run: sudo apt-get install -y ffmpeg
       - run: pip install -e ".[dev,server]"
+      - run: mkdir -p work
+      - run: alembic upgrade head
+        env:
+          DATABASE_URL: sqlite:///./work/ci_test.db
       - run: python -m pytest tests/ -q
 
   security:
