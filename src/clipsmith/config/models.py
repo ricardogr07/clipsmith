@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 
 
 class ClipConfig(BaseModel):
-    min_seconds: int = 15
-    max_seconds: int = 30
+    min_seconds: int = 150
+    max_seconds: int = 150
     preroll_s: int = 25
     postroll_s: int = 10
     min_clip_gap_s: int = 120  # minimum seconds between candidates sent to LLM

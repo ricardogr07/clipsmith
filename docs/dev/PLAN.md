@@ -22,8 +22,8 @@ Transform clipsmith from a CLI tool into a **production-grade, full-stack AI con
 | 6 | Infrastructure as Code | Terraform modules, Key Vault, ACR | ✅ Done |
 | 7 | Observability Stack | OpenTelemetry traces, Prometheus metrics, Grafana | ✅ Done |
 | 8 | Run Detail UI | Video player, keyboard shortcuts, signal charts | ✅ Done |
-| 9 | DB Migrations | Alembic, DATABASE_URL abstraction, PostgreSQL | 🚧 In Progress |
-| 10 | Continuous Deployment | deploy.yml, ACI update, health-check gate | 🔜 Planned |
+| 9 | DB Migrations | Alembic, DATABASE_URL abstraction, PostgreSQL | ✅ Done |
+| 10 | Continuous Deployment | deploy.yml, ACI update, health-check gate | 🚧 In Progress |
 
 ---
 
@@ -91,7 +91,7 @@ Transform clipsmith from a CLI tool into a **production-grade, full-stack AI con
 - Second prompt template (`v2`) in `llm/prompts.py` for A/B comparison
 - `RunCreate.prompt_version` field so the dashboard can select prompt template
 
-**See:** [sprint5.md](sprint5.md) · **Status:** 🔜 Next
+**See:** [sprint5.md](sprint5.md) · **Status:** ✅ Done
 
 ---
 
@@ -136,7 +136,7 @@ Transform clipsmith from a CLI tool into a **production-grade, full-stack AI con
 - Keyboard navigation: arrow keys to select clip, J = approve, K = reject, Space = play/pause
 - Signal breakdown bar chart per clip (uses `signal_breakdown` from Sprint 5)
 
-**See:** [sprint8.md](sprint8.md) · **Status:** 🚧 In Progress
+**See:** [sprint8.md](sprint8.md) · **Status:** ✅ Done
 
 ---
 
@@ -151,7 +151,7 @@ Transform clipsmith from a CLI tool into a **production-grade, full-stack AI con
 - CI runs `alembic upgrade head` before pytest
 - `docs/configuration.md` updated with DATABASE_URL section
 
-**See:** [sprint9.md](sprint9.md) · **Status:** 🔜 Planned
+**See:** [sprint9.md](sprint9.md) · **Status:** ✅ Done
 
 ---
 
@@ -165,7 +165,7 @@ Transform clipsmith from a CLI tool into a **production-grade, full-stack AI con
 - Manual approval gate for promotion from dev to prod ACI instance
 - `deploy.yml` matrix variable for dev vs prod environment
 
-**See:** [sprint10.md](sprint10.md) · **Status:** 🔜 Planned
+**See:** [sprint10.md](sprint10.md) · **Status:** 🚧 In Progress
 
 ---
 

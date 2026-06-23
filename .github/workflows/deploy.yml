@@ -1,0 +1,185 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment (dev | prod)
+        default: dev
+        type: choice
+        options: [dev, prod]
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+env:
+  IMAGE_NAME: clipsmith
+
+jobs:
+  # ── 1. Build and push image to ACR ──────────────────────────────────────
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to ACR
+        run: az acr login --name ${{ secrets.ACR_LOGIN_SERVER }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+          cache-to: type=inline
+
+  # ── 2. Deploy to dev ─────────────────────────────────────────────────────
+  deploy-dev:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      ACI_NAME: ${{ secrets.ACI_NAME_DEV }}
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Update container image
+        run: |
+          IMAGE="${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image_tag }}"
+          az container create \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --name "$ACI_NAME" \
+            --image "$IMAGE" \
+            --registry-login-server "${{ secrets.ACR_LOGIN_SERVER }}" \
+            --registry-username "${{ secrets.ACR_USERNAME }}" \
+            --registry-password "${{ secrets.ACR_PASSWORD }}" \
+            --cpu 1 --memory 2 \
+            --ports 8000 \
+            --ip-address Public \
+            --restart-policy Always \
+            --environment-variables \
+              CLIPSMITH_API_KEY="${{ secrets.CLIPSMITH_API_KEY }}" \
+              DATABASE_URL="sqlite:////app/data/clipsmith.db" \
+            --no-wait
+
+      - name: Wait for container to start
+        run: |
+          for i in $(seq 1 12); do
+            STATE=$(az container show \
+              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --name "$ACI_NAME" \
+              --query "instanceView.state" -o tsv 2>/dev/null || echo "Unknown")
+            echo "State: $STATE (attempt $i/12)"
+            [ "$STATE" = "Running" ] && break
+            sleep 10
+          done
+
+      - name: Get container IP
+        id: ip
+        run: |
+          IP=$(az container show \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --name "$ACI_NAME" \
+            --query "ipAddress.ip" -o tsv)
+          echo "ip=$IP" >> "$GITHUB_OUTPUT"
+
+      - name: Health check
+        id: health
+        run: |
+          URL="http://${{ steps.ip.outputs.ip }}:8000/health"
+          for i in $(seq 1 6); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo "000")
+            echo "Health: $STATUS (attempt $i/6)"
+            [ "$STATUS" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "::error::Health check failed after 60s"
+          exit 1
+
+      - name: Rollback on failure
+        if: failure() && steps.health.outcome == 'failure'
+        run: |
+          PREV_IMAGE="${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest"
+          echo "Rolling back to $PREV_IMAGE"
+          az container create \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --name "$ACI_NAME" \
+            --image "$PREV_IMAGE" \
+            --registry-login-server "${{ secrets.ACR_LOGIN_SERVER }}" \
+            --registry-username "${{ secrets.ACR_USERNAME }}" \
+            --registry-password "${{ secrets.ACR_PASSWORD }}" \
+            --cpu 1 --memory 2 \
+            --ports 8000 \
+            --ip-address Public \
+            --restart-policy Always \
+            --environment-variables \
+              CLIPSMITH_API_KEY="${{ secrets.CLIPSMITH_API_KEY }}" \
+              DATABASE_URL="sqlite:////app/data/clipsmith.db"
+
+  # ── 3. Promote to prod (manual gate) ─────────────────────────────────────
+  deploy-prod:
+    needs: [deploy-dev, build]
+    runs-on: ubuntu-latest
+    environment: prod          # GitHub environment with required reviewers set
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod'
+    env:
+      ACI_NAME: ${{ secrets.ACI_NAME_PROD }}
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to prod
+        run: |
+          IMAGE="${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image_tag }}"
+          az container create \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --name "$ACI_NAME" \
+            --image "$IMAGE" \
+            --registry-login-server "${{ secrets.ACR_LOGIN_SERVER }}" \
+            --registry-username "${{ secrets.ACR_USERNAME }}" \
+            --registry-password "${{ secrets.ACR_PASSWORD }}" \
+            --cpu 2 --memory 4 \
+            --ports 8000 \
+            --ip-address Public \
+            --restart-policy Always \
+            --environment-variables \
+              CLIPSMITH_API_KEY="${{ secrets.CLIPSMITH_API_KEY }}" \
+              DATABASE_URL="${{ secrets.DATABASE_URL_PROD }}"
+
+      - name: Prod health check
+        run: |
+          IP=$(az container show \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --name "$ACI_NAME" \
+            --query "ipAddress.ip" -o tsv)
+          curl --retry 6 --retry-delay 10 --retry-connrefused -sf "http://$IP:8000/health"

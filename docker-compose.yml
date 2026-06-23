@@ -1,0 +1,29 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - ./work:/app/work
+      - ./out:/app/out
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  web:
+    build:
+      context: ./web
+      args:
+        NEXT_PUBLIC_API_BASE: http://localhost:8000
+    ports:
+      - "3000:3000"
+    environment:
+      API_KEY: ${CLIPSMITH_API_KEY}
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
+    depends_on:
+      api:
+        condition: service_healthy

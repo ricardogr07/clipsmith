@@ -8,8 +8,8 @@ work_dir: ./work
 out_dir: ./out
 
 clip:
-  min_seconds: 15
-  max_seconds: 30
+  min_seconds: 150
+  max_seconds: 150
   # Pre-roll/post-roll relative to LLM-picked center
   preroll_s: 25
   postroll_s: 10
