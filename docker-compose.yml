@@ -23,6 +23,7 @@ services:
       - "3000:3000"
     environment:
       API_KEY: ${CLIPSMITH_API_KEY}
+      API_BASE: http://api:8000
       NEXT_PUBLIC_API_BASE: http://localhost:8000
     depends_on:
       api:

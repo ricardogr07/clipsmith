@@ -263,7 +263,7 @@ def serve(
         console.print("[red]uvicorn not installed.[/red] Run: pip install 'clipsmith-ai[server]'")
         raise typer.Exit(1)
 
-    console.print(f"[green]clipsmith API[/green] → http://{host}:{port}/docs")
+    console.print(f"[green]clipsmith API[/green] http://{host}:{port}/docs")
     uvicorn.run("clipsmith.api.app:app", host=host, port=port, reload=reload)
 
 
