@@ -4,6 +4,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Azure CLI — installed before pip so its azure libs don't corrupt the namespace packages
+RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd -r clipsmith && useradd -r -g clipsmith -d /home/clipsmith -m clipsmith
 
 WORKDIR /app
@@ -16,6 +20,7 @@ COPY config.yaml config.yaml
 COPY scripts/start_server.sh /app/start_server.sh
 
 # Install all extras needed for API server + cloud ACI offload
+# Runs after Azure CLI so pip's azure packages take ownership of the namespace
 RUN pip install --no-cache-dir -e ".[server,vision,observability,cloud]"
 
 # Bake the Whisper model into /app/.cache so the clipsmith user can access it.
@@ -23,10 +28,6 @@ RUN pip install --no-cache-dir -e ".[server,vision,observability,cloud]"
 # Rebuild the image if you switch to "medium" or "large-v3".
 ENV HF_HOME=/app/.cache/huggingface
 RUN python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')"
-
-# Azure CLI — required for AzureCliCredential when ~/.azure is mounted (local dev)
-RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash \
-    && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /home/clipsmith/.azure /app/data /app/work /app/out && \
     chmod +x /app/start_server.sh && \
