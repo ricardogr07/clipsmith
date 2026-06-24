@@ -95,36 +95,42 @@ jobs:
 
       - name: Wait for container to start
         run: |
-          for i in $(seq 1 12); do
+          for i in $(seq 1 20); do
             STATE=$(az container show \
               --resource-group ${{ secrets.RESOURCE_GROUP }} \
               --name "$ACI_NAME" \
               --query "instanceView.state" -o tsv 2>/dev/null || echo "Unknown")
-            echo "State: $STATE (attempt $i/12)"
+            echo "State: $STATE (attempt $i/20)"
             [ "$STATE" = "Running" ] && break
-            sleep 10
+            sleep 15
           done
 
       - name: Get container IP
         id: ip
         run: |
-          IP=$(az container show \
-            --resource-group ${{ secrets.RESOURCE_GROUP }} \
-            --name "$ACI_NAME" \
-            --query "ipAddress.ip" -o tsv)
-          echo "ip=$IP" >> "$GITHUB_OUTPUT"
+          for i in $(seq 1 10); do
+            IP=$(az container show \
+              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --name "$ACI_NAME" \
+              --query "ipAddress.ip" -o tsv 2>/dev/null || echo "")
+            echo "IP attempt $i: $IP"
+            [ -n "$IP" ] && echo "ip=$IP" >> "$GITHUB_OUTPUT" && exit 0
+            sleep 10
+          done
+          echo "::error::Could not retrieve container IP after 100s"
+          exit 1
 
       - name: Health check
         id: health
         run: |
           URL="http://${{ steps.ip.outputs.ip }}:8000/health"
-          for i in $(seq 1 6); do
+          for i in $(seq 1 12); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo "000")
-            echo "Health: $STATUS (attempt $i/6)"
+            echo "Health: $STATUS (attempt $i/12)"
             [ "$STATUS" = "200" ] && exit 0
             sleep 10
           done
-          echo "::error::Health check failed after 60s"
+          echo "::error::Health check failed after 120s"
           exit 1
 
       - name: Rollback on failure

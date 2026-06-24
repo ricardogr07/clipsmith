@@ -28,9 +28,9 @@ RUN python -c "from faster_whisper import WhisperModel; WhisperModel('small', de
 RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /home/clipsmith/.azure && \
+RUN mkdir -p /home/clipsmith/.azure /app/data /app/work /app/out && \
     chmod +x /app/start_server.sh && \
-    chown -R clipsmith:clipsmith /app/.cache /home/clipsmith
+    chown -R clipsmith:clipsmith /app/.cache /home/clipsmith /app/data /app/work /app/out
 
 VOLUME ["/app/work", "/app/out", "/app/data"]
 
