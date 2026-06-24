@@ -1,0 +1,79 @@
+name: Infra Setup (Terraform)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment (dev | prod)
+        default: dev
+        type: choice
+        options: [dev, prod]
+      aci_sp_object_id:
+        description: Object ID of the ACI service principal (az ad sp show --id <CLIENT_ID> --query id -o tsv)
+        required: true
+        type: string
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    defaults:
+      run:
+        working-directory: infra
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.7"
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform apply
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: "true"
+          TF_VAR_aci_sp_object_id: ${{ github.event.inputs.aci_sp_object_id }}
+          TF_VAR_environment: ${{ github.event.inputs.environment }}
+          TF_VAR_secrets: >-
+            {
+              "ANTHROPIC_API_KEY": "${{ secrets.ANTHROPIC_API_KEY }}",
+              "TWITCH_CLIENT_ID": "${{ secrets.TWITCH_CLIENT_ID }}",
+              "TWITCH_CLIENT_SECRET": "${{ secrets.TWITCH_CLIENT_SECRET }}"
+            }
+        run: |
+          terraform apply -auto-approve \
+            -var-file=environments/${{ github.event.inputs.environment }}.tfvars
+
+      - name: Print outputs
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: "true"
+        run: |
+          echo "=== Terraform outputs (add these as GitHub secrets) ==="
+          echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)"
+          echo "ACR_USERNAME=$(terraform output -raw acr_admin_username)"
+          echo "RESOURCE_GROUP=$(terraform output -raw resource_group_name)"
+          echo "KEY_VAULT_URI=$(terraform output -raw key_vault_uri)"
+          echo ""
+          echo "ACR_PASSWORD and storage keys are sensitive — retrieve with:"
+          echo "  terraform output -raw acr_admin_password"
+          echo "  terraform output -raw storage_account_key"

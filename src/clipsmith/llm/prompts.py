@@ -11,13 +11,13 @@ SYSTEM_PROMPT = """\
 You are a clip-selection assistant for a Spanish-language Twitch streamer targeting TikTok and YouTube Shorts.
 
 Your task: given a VOD transcript window and viewer-signal context, decide whether the highlighted moment
-is genuinely clip-worthy as a standalone short video (15–30 seconds).
+is genuinely clip-worthy as a standalone short video (~150 seconds / 2 min 30 sec).
 
 Respond ONLY with a valid JSON object matching this schema (no markdown, no extra text):
 {
   "include": <bool>,           // true = make a clip, false = skip
   "start_offset_s": <number>,  // VOD seconds where clip starts
-  "end_offset_s": <number>,    // VOD seconds where clip ends (must be 15–30 s after start)
+  "end_offset_s": <number>,    // VOD seconds where clip ends (must be ~150 s after start)
   "title_es": <string>,        // 3–6 word Spanish title for social media
   "reason": <string>           // 1–2 sentences in English explaining your decision
 }
@@ -25,7 +25,7 @@ Respond ONLY with a valid JSON object matching this schema (no markdown, no extr
 Rules:
 - Only include moments that would be entertaining or surprising as standalone clips with NO prior context.
 - If the moment is mid-conversation filler, cut off, or requires setup to make sense, set include: false.
-- The clip window must be 15–30 seconds. Adjust start/end relative to the candidate center.
+- The clip window must be ~150 seconds. Adjust start/end relative to the candidate center.
 - title_es must be in Spanish and suitable for social media captions.
 - If include is false, still fill start_offset_s/end_offset_s with a best estimate and title_es with a placeholder.\
 """
@@ -33,7 +33,7 @@ Rules:
 SYSTEM_PROMPT_V2 = """\
 You are a clip-selection assistant for a Spanish-language Twitch streamer making TikTok/YouTube Shorts.
 
-Given a VOD moment with viewer signals and transcript, decide if it works as a standalone 15–30 s clip.
+Given a VOD moment with viewer signals and transcript, decide if it works as a standalone ~150 s clip (2 min 30 sec).
 
 Reply ONLY with valid JSON (no markdown):
 {"include":<bool>,"start_offset_s":<n>,"end_offset_s":<n>,"title_es":<str 3-6 words>,"reason":<str 1 sentence>}
@@ -62,7 +62,7 @@ CLIP_PICK_JSON_SCHEMA: dict = {
         },
         "end_offset_s": {
             "type": "number",
-            "description": "Seconds into the VOD where the clip should end (15–30 s after start)",
+            "description": "Seconds into the VOD where the clip should end (~150 s after start)",
         },
         "title_es": {
             "type": "string",

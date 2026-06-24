@@ -31,7 +31,7 @@ state.json
 tests/
 docs/
 examples/
-scripts/
+# scripts/ intentionally NOT excluded — start_server.sh is copied in Dockerfile
 mkdocs.yml
 AzureCLI.msi
 clipsmith.spec

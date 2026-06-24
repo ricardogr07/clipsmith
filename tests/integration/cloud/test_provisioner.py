@@ -71,7 +71,7 @@ def mock_sc() -> MagicMock:
     mock_key = MagicMock()
     mock_key.value = "base64key=="
     sc.storage_accounts.begin_create.return_value.result.return_value = MagicMock()
-    sc.storage_accounts.list_keys.return_value.keys = [mock_key]
+    sc.storage_accounts.list_keys.return_value.keys_property = [mock_key]
     sc.file_shares.create.return_value = MagicMock()
     return sc
 

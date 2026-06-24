@@ -47,6 +47,10 @@ export default function DashboardPage() {
     setRuns((prev) => [run, ...prev]);
   }
 
+  function handleDeleted(id: number) {
+    setRuns((prev) => prev.filter((r) => r.id !== id));
+  }
+
   return (
     <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       <div className="flex items-center justify-between">
@@ -74,7 +78,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {runs.map((run) => (
-          <RunCard key={run.id} run={run} />
+          <RunCard key={run.id} run={run} onDelete={handleDeleted} />
         ))}
       </div>
     </main>

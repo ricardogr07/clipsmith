@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { api } from "@/lib/api";
 import type { Run, RunStatus } from "@/lib/types";
 
 const STATUS_VARIANT: Record<RunStatus, "default" | "secondary" | "destructive" | "outline"> = {
@@ -29,14 +32,43 @@ function relativeTime(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-export function RunCard({ run }: { run: Run }) {
+interface RunCardProps {
+  run: Run;
+  onDelete?: (id: number) => void;
+}
+
+export function RunCard({ run, onDelete }: RunCardProps) {
+  async function handleDelete(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await api.runs.delete(run.id);
+      onDelete?.(run.id);
+    } catch (err) {
+      console.error("Failed to delete run:", err);
+    }
+  }
+
   return (
     <Link href={`/runs/${run.id}`} className="block hover:no-underline">
       <Card className="hover:shadow-md transition-shadow cursor-pointer">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-base font-mono truncate">{run.vod_id}</CardTitle>
-            <Badge variant={STATUS_VARIANT[run.status]}>{STATUS_LABEL[run.status]}</Badge>
+            <div className="flex items-center gap-1 shrink-0">
+              <Badge variant={STATUS_VARIANT[run.status]}>{STATUS_LABEL[run.status]}</Badge>
+              {run.status === "failed" && onDelete && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                  onClick={handleDelete}
+                  aria-label="Delete run"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
           </div>
           {run.channel && (
             <p className="text-sm text-muted-foreground">@{run.channel}</p>

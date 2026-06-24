@@ -35,3 +35,13 @@ output "acr_admin_password" {
 output "key_vault_uri" {
   value = module.keyvault.vault_uri
 }
+
+output "mi_client_id" {
+  value       = azurerm_user_assigned_identity.github_runner.client_id
+  description = "Client ID of the User-Assigned Managed Identity — use as AZURE_CLIENT_ID in GitHub secrets and container env"
+}
+
+output "mi_resource_id" {
+  value       = azurerm_user_assigned_identity.github_runner.id
+  description = "Full resource ID of the MI — pass to --assign-identity in az container create"
+}

@@ -18,6 +18,12 @@ resource "azurerm_key_vault" "main" {
     object_id          = var.aci_sp_object_id
     secret_permissions = ["Get", "List"]
   }
+
+  access_policy {
+    tenant_id          = data.azurerm_client_config.current.tenant_id
+    object_id          = var.mi_object_id
+    secret_permissions = ["Get", "List"]
+  }
 }
 
 resource "azurerm_key_vault_secret" "secrets" {

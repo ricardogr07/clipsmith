@@ -4,6 +4,36 @@
 
 ---
 
+## Persistent API Server
+
+The `clipsmith serve` API server runs as a **persistent** ACI instance that stays alive between pipeline runs. The deploy workflow (`deploy.yml`) updates it automatically on every merge to `main`. Bootstrap it once:
+
+```bash
+az container create \
+  --resource-group clipsmith-rg-dev \
+  --name clipsmith-api-dev \
+  --image "$ACR_LOGIN_SERVER/clipsmith:latest" \
+  --registry-login-server "$ACR_LOGIN_SERVER" \
+  --registry-username "$ACR_USERNAME" \
+  --registry-password "$ACR_PASSWORD" \
+  --cpu 1 \
+  --memory 2 \
+  --ports 8000 \
+  --ip-address Public \
+  --restart-policy Always \
+  --environment-variables \
+    CLIPSMITH_API_KEY="$CLIPSMITH_API_KEY" \
+    DATABASE_URL="sqlite:////app/data/clipsmith.db" \
+  --azure-file-volume-account-name "$STORAGE_ACCOUNT" \
+  --azure-file-volume-account-key "$STORAGE_KEY" \
+  --azure-file-volume-share-name clipsmith-work \
+  --azure-file-volume-mount-path /app/data
+```
+
+After the first bootstrap, `deploy.yml` handles all subsequent updates. The container runs `alembic upgrade head` on every startup before accepting traffic.
+
+---
+
 ## Quick Reference
 
 ```powershell
