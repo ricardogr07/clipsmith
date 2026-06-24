@@ -81,6 +81,7 @@ jobs:
             --registry-username "${{ secrets.ACR_USERNAME }}" \
             --registry-password "${{ secrets.ACR_PASSWORD }}" \
             --assign-identity "${{ secrets.MI_RESOURCE_ID }}" \
+            --os-type Linux \
             --cpu 1 --memory 2 \
             --ports 8000 \
             --ip-address Public \
@@ -139,6 +140,7 @@ jobs:
             --registry-username "${{ secrets.ACR_USERNAME }}" \
             --registry-password "${{ secrets.ACR_PASSWORD }}" \
             --assign-identity "${{ secrets.MI_RESOURCE_ID }}" \
+            --os-type Linux \
             --cpu 1 --memory 2 \
             --ports 8000 \
             --ip-address Public \
