@@ -13,15 +13,36 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
 jobs:
   toggle:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Stop ACI
+        if: inputs.action == 'stop'
+        run: |
+          az container stop \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --name ${{ secrets.ACI_NAME_DEV }}
+          echo "Container stopped — compute billing paused."
+
+      - name: Enable maintenance mode
+        if: inputs.action == 'stop'
+        run: |
+          npx vercel env rm MAINTENANCE_MODE production --yes --token "${{ secrets.VERCEL_TOKEN }}" || true
+          echo "true" | npx vercel env add MAINTENANCE_MODE production --token "${{ secrets.VERCEL_TOKEN }}"
+          npx vercel --prod --yes --token "${{ secrets.VERCEL_TOKEN }}" --cwd web
 
       - name: Start ACI
         if: inputs.action == 'start'
@@ -42,10 +63,9 @@ jobs:
           echo ""
           echo "API: http://clipsmith-api-dev.eastus.azurecontainer.io:8000"
 
-      - name: Stop ACI
-        if: inputs.action == 'stop'
+      - name: Disable maintenance mode
+        if: inputs.action == 'start'
         run: |
-          az container stop \
-            --resource-group ${{ secrets.RESOURCE_GROUP }} \
-            --name ${{ secrets.ACI_NAME_DEV }}
-          echo "Container stopped — compute billing paused."
+          npx vercel env rm MAINTENANCE_MODE production --yes --token "${{ secrets.VERCEL_TOKEN }}" || true
+          echo "false" | npx vercel env add MAINTENANCE_MODE production --token "${{ secrets.VERCEL_TOKEN }}"
+          npx vercel --prod --yes --token "${{ secrets.VERCEL_TOKEN }}" --cwd web
