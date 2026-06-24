@@ -163,7 +163,20 @@ jobs:
               AZURE_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
               AZURE_CLIENT_ID="${{ secrets.AZURE_CLIENT_ID }}"
 
-  # ── 3. Promote to prod (manual gate) ─────────────────────────────────────
+  # ── 3. Deploy frontend to Vercel ────────────────────────────────────────
+  deploy-frontend:
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Vercel
+        run: npx vercel --prod --yes --token "${{ secrets.VERCEL_TOKEN }}" --cwd web
+
+  # ── 4. Promote to prod (manual gate) ─────────────────────────────────────
   deploy-prod:
     needs: [deploy-dev, build]
     runs-on: ubuntu-latest
