@@ -73,25 +73,66 @@ jobs:
       - name: Update container image
         run: |
           IMAGE="${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image_tag }}"
+          cat > /tmp/container.yaml << YAML
+          apiVersion: '2021-10-01'
+          location: eastus
+          name: "$ACI_NAME"
+          identity:
+            type: UserAssigned
+            userAssignedIdentities:
+              "${{ secrets.MI_RESOURCE_ID }}": {}
+          properties:
+            osType: Linux
+            restartPolicy: Always
+            ipAddress:
+              type: Public
+              ports:
+                - protocol: TCP
+                  port: 8000
+              dnsNameLabel: clipsmith-api-dev
+            imageRegistryCredentials:
+              - server: "${{ secrets.ACR_LOGIN_SERVER }}"
+                username: "${{ secrets.ACR_USERNAME }}"
+                password: "${{ secrets.ACR_PASSWORD }}"
+            containers:
+              - name: clipsmith-api
+                properties:
+                  image: "$IMAGE"
+                  resources:
+                    requests:
+                      cpu: 1
+                      memoryInGb: 2
+                  ports:
+                    - port: 8000
+                  environmentVariables:
+                    - name: CLIPSMITH_API_KEY
+                      value: "${{ secrets.CLIPSMITH_API_KEY }}"
+                    - name: DATABASE_URL
+                      value: "sqlite:////app/data/clipsmith.db"
+                    - name: AZURE_SUBSCRIPTION_ID
+                      value: "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+                    - name: AZURE_CLIENT_ID
+                      value: "${{ secrets.AZURE_CLIENT_ID }}"
+                  volumeMounts:
+                    - name: data-vol
+                      mountPath: /app/data
+                    - name: out-vol
+                      mountPath: /app/out
+            volumes:
+              - name: data-vol
+                azureFile:
+                  shareName: clipsmith-data
+                  storageAccountName: "${{ secrets.STORAGE_ACCOUNT_NAME }}"
+                  storageAccountKey: "${{ secrets.STORAGE_ACCOUNT_KEY }}"
+              - name: out-vol
+                azureFile:
+                  shareName: clipsmith-out
+                  storageAccountName: "${{ secrets.STORAGE_ACCOUNT_NAME }}"
+                  storageAccountKey: "${{ secrets.STORAGE_ACCOUNT_KEY }}"
+          YAML
           az container create \
             --resource-group ${{ secrets.RESOURCE_GROUP }} \
-            --name "$ACI_NAME" \
-            --image "$IMAGE" \
-            --registry-login-server "${{ secrets.ACR_LOGIN_SERVER }}" \
-            --registry-username "${{ secrets.ACR_USERNAME }}" \
-            --registry-password "${{ secrets.ACR_PASSWORD }}" \
-            --assign-identity "${{ secrets.MI_RESOURCE_ID }}" \
-            --os-type Linux \
-            --cpu 1 --memory 2 \
-            --ports 8000 \
-            --ip-address Public \
-            --dns-name-label clipsmith-api-dev \
-            --restart-policy Always \
-            --environment-variables \
-              CLIPSMITH_API_KEY="${{ secrets.CLIPSMITH_API_KEY }}" \
-              DATABASE_URL="sqlite:////app/data/clipsmith.db" \
-              AZURE_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
-              AZURE_CLIENT_ID="${{ secrets.AZURE_CLIENT_ID }}" \
+            --file /tmp/container.yaml \
             --no-wait
 
       - name: Wait for container to start
@@ -144,24 +185,66 @@ jobs:
         run: |
           PREV_IMAGE="${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest"
           echo "Rolling back to $PREV_IMAGE"
+          cat > /tmp/container-rollback.yaml << YAML
+          apiVersion: '2021-10-01'
+          location: eastus
+          name: "$ACI_NAME"
+          identity:
+            type: UserAssigned
+            userAssignedIdentities:
+              "${{ secrets.MI_RESOURCE_ID }}": {}
+          properties:
+            osType: Linux
+            restartPolicy: Always
+            ipAddress:
+              type: Public
+              ports:
+                - protocol: TCP
+                  port: 8000
+              dnsNameLabel: clipsmith-api-dev
+            imageRegistryCredentials:
+              - server: "${{ secrets.ACR_LOGIN_SERVER }}"
+                username: "${{ secrets.ACR_USERNAME }}"
+                password: "${{ secrets.ACR_PASSWORD }}"
+            containers:
+              - name: clipsmith-api
+                properties:
+                  image: "$PREV_IMAGE"
+                  resources:
+                    requests:
+                      cpu: 1
+                      memoryInGb: 2
+                  ports:
+                    - port: 8000
+                  environmentVariables:
+                    - name: CLIPSMITH_API_KEY
+                      value: "${{ secrets.CLIPSMITH_API_KEY }}"
+                    - name: DATABASE_URL
+                      value: "sqlite:////app/data/clipsmith.db"
+                    - name: AZURE_SUBSCRIPTION_ID
+                      value: "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+                    - name: AZURE_CLIENT_ID
+                      value: "${{ secrets.AZURE_CLIENT_ID }}"
+                  volumeMounts:
+                    - name: data-vol
+                      mountPath: /app/data
+                    - name: out-vol
+                      mountPath: /app/out
+            volumes:
+              - name: data-vol
+                azureFile:
+                  shareName: clipsmith-data
+                  storageAccountName: "${{ secrets.STORAGE_ACCOUNT_NAME }}"
+                  storageAccountKey: "${{ secrets.STORAGE_ACCOUNT_KEY }}"
+              - name: out-vol
+                azureFile:
+                  shareName: clipsmith-out
+                  storageAccountName: "${{ secrets.STORAGE_ACCOUNT_NAME }}"
+                  storageAccountKey: "${{ secrets.STORAGE_ACCOUNT_KEY }}"
+          YAML
           az container create \
             --resource-group ${{ secrets.RESOURCE_GROUP }} \
-            --name "$ACI_NAME" \
-            --image "$PREV_IMAGE" \
-            --registry-login-server "${{ secrets.ACR_LOGIN_SERVER }}" \
-            --registry-username "${{ secrets.ACR_USERNAME }}" \
-            --registry-password "${{ secrets.ACR_PASSWORD }}" \
-            --assign-identity "${{ secrets.MI_RESOURCE_ID }}" \
-            --os-type Linux \
-            --cpu 1 --memory 2 \
-            --ports 8000 \
-            --ip-address Public \
-            --restart-policy Always \
-            --environment-variables \
-              CLIPSMITH_API_KEY="${{ secrets.CLIPSMITH_API_KEY }}" \
-              DATABASE_URL="sqlite:////app/data/clipsmith.db" \
-              AZURE_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
-              AZURE_CLIENT_ID="${{ secrets.AZURE_CLIENT_ID }}"
+            --file /tmp/container-rollback.yaml
 
   # ── 3. Deploy frontend to Vercel ────────────────────────────────────────
   deploy-frontend:
