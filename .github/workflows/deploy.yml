@@ -80,6 +80,7 @@ jobs:
             --registry-login-server "${{ secrets.ACR_LOGIN_SERVER }}" \
             --registry-username "${{ secrets.ACR_USERNAME }}" \
             --registry-password "${{ secrets.ACR_PASSWORD }}" \
+            --assign-identity "${{ secrets.MI_RESOURCE_ID }}" \
             --cpu 1 --memory 2 \
             --ports 8000 \
             --ip-address Public \
@@ -87,6 +88,8 @@ jobs:
             --environment-variables \
               CLIPSMITH_API_KEY="${{ secrets.CLIPSMITH_API_KEY }}" \
               DATABASE_URL="sqlite:////app/data/clipsmith.db" \
+              AZURE_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+              AZURE_CLIENT_ID="${{ secrets.AZURE_CLIENT_ID }}" \
             --no-wait
 
       - name: Wait for container to start
@@ -135,13 +138,16 @@ jobs:
             --registry-login-server "${{ secrets.ACR_LOGIN_SERVER }}" \
             --registry-username "${{ secrets.ACR_USERNAME }}" \
             --registry-password "${{ secrets.ACR_PASSWORD }}" \
+            --assign-identity "${{ secrets.MI_RESOURCE_ID }}" \
             --cpu 1 --memory 2 \
             --ports 8000 \
             --ip-address Public \
             --restart-policy Always \
             --environment-variables \
               CLIPSMITH_API_KEY="${{ secrets.CLIPSMITH_API_KEY }}" \
-              DATABASE_URL="sqlite:////app/data/clipsmith.db"
+              DATABASE_URL="sqlite:////app/data/clipsmith.db" \
+              AZURE_SUBSCRIPTION_ID="${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+              AZURE_CLIENT_ID="${{ secrets.AZURE_CLIENT_ID }}"
 
   # ── 3. Promote to prod (manual gate) ─────────────────────────────────────
   deploy-prod:
