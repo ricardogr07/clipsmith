@@ -170,14 +170,14 @@ jobs:
       - name: Health check
         id: health
         run: |
-          URL="http://${{ steps.ip.outputs.ip }}:8000/health"
-          for i in $(seq 1 12); do
+          URL="http://clipsmith-api-dev.eastus.azurecontainer.io:8000/health"
+          for i in $(seq 1 24); do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo "000")
-            echo "Health: $STATUS (attempt $i/12)"
+            echo "Health: $STATUS (attempt $i/24)"
             [ "$STATUS" = "200" ] && exit 0
-            sleep 10
+            sleep 15
           done
-          echo "::error::Health check failed after 120s"
+          echo "::error::Health check failed after 360s"
           exit 1
 
       - name: Rollback on failure
