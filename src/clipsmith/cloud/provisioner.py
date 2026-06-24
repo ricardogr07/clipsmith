@@ -81,7 +81,7 @@ def provision_run_resources(vod_id: str, config: AppConfig, secrets: Secrets) ->
             raise
 
     keys_result = sc.storage_accounts.list_keys(rg_name, sa_name)
-    sa_key: str = keys_result.keys[0].value
+    sa_key: str = keys_result.keys_property[0].value
 
     for share_name, quota_gb in [(_WORK_SHARE, 50), (_OUT_SHARE, 20)]:
         sc.file_shares.create(rg_name, sa_name, share_name, {"share_quota": quota_gb})

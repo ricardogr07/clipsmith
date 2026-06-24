@@ -118,6 +118,26 @@ def delete_all_runs(request: Request, db: Session = Depends(get_db)) -> Response
     return Response(status_code=204)
 
 
+@router.delete(
+    "/{run_id}",
+    status_code=204,
+    summary="Delete a failed run",
+    dependencies=[Depends(verify_api_key)],
+)
+def delete_run(run_id: int, db: Session = Depends(get_db)) -> Response:
+    """Delete a single failed run and its clips/events. Returns 409 if not failed."""
+    run = db.get(Run, run_id)
+    if not run:
+        raise HTTPException(404, "Run not found")
+    if run.status != RunStatus.failed:
+        raise HTTPException(409, "Only failed runs can be deleted")
+    db.query(PipelineEvent).filter(PipelineEvent.run_id == run_id).delete()
+    db.query(Clip).filter(Clip.run_id == run_id).delete()
+    db.delete(run)
+    db.commit()
+    return Response(status_code=204)
+
+
 @router.get("/{run_id}", summary="Get a run by ID")
 def get_run(run_id: int, db: Session = Depends(get_db)) -> dict:
     """Return a single run record. 404 if not found."""

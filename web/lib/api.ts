@@ -20,6 +20,7 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     const text = await res.text().catch(() => res.statusText);
     throw new Error(`${res.status}: ${text}`);
   }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -29,6 +30,7 @@ export const api = {
     get: (id: number) => apiFetch<Run>(`/runs/${id}`),
     create: (body: RunCreate) =>
       apiFetch<Run>("/runs", { method: "POST", body: JSON.stringify(body) }),
+    delete: (id: number) => apiFetch<void>(`/runs/${id}`, { method: "DELETE" }),
   },
   clips: {
     list: (runId: number) => apiFetch<Clip[]>(`/runs/${runId}/clips`),

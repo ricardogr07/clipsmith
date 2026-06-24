@@ -96,11 +96,25 @@ def create_container_group(
     acct = run_ctx.storage_account if run_ctx else secrets.azure_storage_account
     key = run_ctx.storage_key if run_ctx else secrets.azure_storage_key
 
-    env_vars = [
-        EnvironmentVariable(name="ANTHROPIC_API_KEY", secure_value=secrets.anthropic_api_key),
-        EnvironmentVariable(name="OPENAI_API_KEY", secure_value=secrets.openai_api_key),
-        EnvironmentVariable(name="TWITCH_CLIENT_ID", secure_value=secrets.twitch_client_id),
-        EnvironmentVariable(name="TWITCH_CLIENT_SECRET", secure_value=secrets.twitch_client_secret),
+    kv_env: dict[str, str] = {}
+    if config.cloud.key_vault_uri and config.cloud.secret_names:
+        kv_env = {
+            k.replace("-", "_"): v
+            for k, v in _resolve_secrets(
+                config.cloud.key_vault_uri, config.cloud.secret_names
+            ).items()
+        }
+
+    local_defaults = [
+        ("ANTHROPIC_API_KEY", secrets.anthropic_api_key),
+        ("OPENAI_API_KEY", secrets.openai_api_key),
+        ("TWITCH_CLIENT_ID", secrets.twitch_client_id),
+        ("TWITCH_CLIENT_SECRET", secrets.twitch_client_secret),
+    ]
+    env_vars = [EnvironmentVariable(name=k, secure_value=v) for k, v in kv_env.items()] + [
+        EnvironmentVariable(name=name, secure_value=val)
+        for name, val in local_defaults
+        if name not in kv_env
     ]
 
     volumes = [
@@ -143,10 +157,6 @@ def create_container_group(
         ],
         command=["clipsmith", "run-vod", vod_id, "--config", "/app/work/config.yaml", "-v"],
     )
-
-    if config.cloud.key_vault_uri and config.cloud.secret_names:
-        kv_secrets = _resolve_secrets(config.cloud.key_vault_uri, config.cloud.secret_names)
-        env_vars.extend(EnvironmentVariable(name=k, secure_value=v) for k, v in kv_secrets.items())
 
     registry_creds = None
     if secrets.docker_hub_username and secrets.docker_hub_password:

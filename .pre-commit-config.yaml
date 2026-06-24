@@ -33,6 +33,7 @@ repos:
         language: system
         pass_filenames: false
         files: ^web/
+        stages: [push]
 
       - id: pnpm-storybook-build
         name: Storybook build

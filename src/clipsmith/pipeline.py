@@ -57,6 +57,7 @@ def process_vod(
     prompt_version: str = "v1",
     max_candidates: int = 20,
     start_s: float = 0.0,
+    end_s: float = 0.0,
     on_stage: Callable[[str, float], None] | None = None,
     resume: bool = False,
 ) -> None:
@@ -129,6 +130,15 @@ def process_vod(
             len(transcript.segments),
             start_s,
         )
+    if end_s > 0:
+        before = len(transcript.segments)
+        transcript.segments = [s for s in transcript.segments if s.start <= end_s]
+        log.info(
+            "trimmed transcript: %d -> %d segments (end_s=%.0f)",
+            before,
+            len(transcript.segments),
+            end_s,
+        )
     console.print(
         f"[green]transcript done[/green]: {len(transcript.segments)} segments, "
         f"language={transcript.language}"
@@ -152,6 +162,10 @@ def process_vod(
         log.info(
             "trimmed chat: %d -> %d messages (start_s=%.0f)", before, len(chat.messages), start_s
         )
+    if end_s > 0:
+        before = len(chat.messages)
+        chat.messages = [m for m in chat.messages if m.time_in_seconds <= end_s]
+        log.info("trimmed chat: %d -> %d messages (end_s=%.0f)", before, len(chat.messages), end_s)
     console.print(f"[green]chat loaded[/green]: {len(chat.messages)} messages")
 
     log.info("stage_start", stage="candidates")

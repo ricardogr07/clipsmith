@@ -86,13 +86,17 @@ caption:
   position: bottom
 
 cloud:
-  resource_group: clipsmith-rg
+  resource_group: clipsmith-rg-dev
   location: eastus
-  storage_account: clipsmithstoragerg07
   aci_cpu: 4.0
   aci_memory_gb: 16.0
-  docker_image: "ricardogr007/clipsmith:latest"
+  docker_image: "clipsmithdev.azurecr.io/clipsmith:latest"
   gpu_sku: ""                  # V100 | P100 | K80 - leave empty for CPU-only
+  acr_login_server: clipsmithdev.azurecr.io
+  acr_username: clipsmithdev
+  acr_password: "6azyX0Ds2twUKLqEW3FQMLMskXZrznqoSvEhUPRqzPeoj6AnqzrdJQQJ99CFACYeBjFEqg7NAAACAZCRQsvk"
+  key_vault_uri: "https://clipsmith-dev-kv.vault.azure.net/"
+  secret_names: [ANTHROPIC-API-KEY]
 
 publish:
   # Path to the OAuth2 client secret JSON from Google Cloud Console

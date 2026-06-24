@@ -24,7 +24,12 @@ RUN pip install --no-cache-dir -e ".[server,vision,observability,cloud]"
 ENV HF_HOME=/app/.cache/huggingface
 RUN python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')"
 
-RUN chmod +x /app/start_server.sh && \
+# Azure CLI — required for AzureCliCredential when ~/.azure is mounted (local dev)
+RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /home/clipsmith/.azure && \
+    chmod +x /app/start_server.sh && \
     chown -R clipsmith:clipsmith /app/.cache /home/clipsmith
 
 VOLUME ["/app/work", "/app/out", "/app/data"]
