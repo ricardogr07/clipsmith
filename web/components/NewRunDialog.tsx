@@ -21,8 +21,23 @@ export function NewRunDialog({ onCreated }: Props) {
   const [open, setOpen] = useState(false);
   const [vodId, setVodId] = useState("");
   const [channel, setChannel] = useState("");
+  const [startS, setStartS] = useState("");
+  const [endS, setEndS] = useState("");
+  const [cloud, setCloud] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) {
+      setVodId("");
+      setChannel("");
+      setStartS("");
+      setEndS("");
+      setCloud(true);
+      setError(null);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,11 +45,15 @@ export function NewRunDialog({ onCreated }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const run = await api.runs.create({ vod_id: vodId.trim(), channel: channel.trim() });
+      const run = await api.runs.create({
+        vod_id: vodId.trim(),
+        channel: channel.trim() || undefined,
+        start_s: startS ? parseFloat(startS) : undefined,
+        end_s: endS ? parseFloat(endS) : undefined,
+        cloud,
+      });
       onCreated(run);
-      setOpen(false);
-      setVodId("");
-      setChannel("");
+      handleOpenChange(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create run");
     } finally {
@@ -43,7 +62,7 @@ export function NewRunDialog({ onCreated }: Props) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger render={<Button />}>New Run</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -68,9 +87,40 @@ export function NewRunDialog({ onCreated }: Props) {
               onChange={(e) => setChannel(e.target.value)}
             />
           </div>
+          <div className="flex gap-2">
+            <div className="space-y-1 flex-1">
+              <label className="text-sm font-medium">Start (s)</label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="0"
+                value={startS}
+                onChange={(e) => setStartS(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1 flex-1">
+              <label className="text-sm font-medium">End (s)</label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="0 = full VOD"
+                value={endS}
+                onChange={(e) => setEndS(e.target.value)}
+              />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={cloud}
+              onChange={(e) => setCloud(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Cloud offload (ACI)
+          </label>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={loading || !vodId.trim()}>
