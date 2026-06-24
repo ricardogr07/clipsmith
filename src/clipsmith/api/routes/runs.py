@@ -5,13 +5,13 @@ from __future__ import annotations
 import re
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy.orm import Session
 
 from ..deps import get_db, verify_api_key
 from ..worker import start_run
-from ...db.models import Run, RunStatus
+from ...db.models import Clip, PipelineEvent, Run, RunStatus
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -45,6 +45,9 @@ class RunCreate(BaseModel):
     channel: str = ""
     provider: Literal["anthropic", "openai", "ollama"] | None = None
     prompt_version: Literal["v1", "v2"] = "v1"
+    start_s: float = 0.0
+    end_s: float = 0.0
+    cloud: bool = False
 
     @field_validator("vod_id")
     @classmethod
@@ -87,6 +90,9 @@ def create_run(
         body.provider,
         request.app,
         body.prompt_version,
+        body.start_s,
+        body.end_s,
+        body.cloud,
     )
     return run.to_dict()
 
@@ -96,6 +102,20 @@ def list_runs(db: Session = Depends(get_db)) -> list[dict]:
     """Return all pipeline runs ordered by creation time descending."""
     runs = db.query(Run).order_by(Run.created_at.desc()).all()
     return [r.to_dict() for r in runs]
+
+
+@router.delete(
+    "", status_code=204, summary="Delete all runs", dependencies=[Depends(verify_api_key)]
+)
+def delete_all_runs(request: Request, db: Session = Depends(get_db)) -> Response:
+    """Delete every run, clip, and pipeline event. Blocked while a run is in progress."""
+    if request.app.state.active_run_id is not None:
+        raise HTTPException(409, "Cannot delete runs while a pipeline run is in progress")
+    db.query(PipelineEvent).delete()
+    db.query(Clip).delete()
+    db.query(Run).delete()
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.get("/{run_id}", summary="Get a run by ID")

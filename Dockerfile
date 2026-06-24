@@ -15,8 +15,8 @@ COPY alembic/ alembic/
 COPY config.yaml config.yaml
 COPY scripts/start_server.sh /app/start_server.sh
 
-# Install API server + pipeline extras (cloud packages are local-CLI-only)
-RUN pip install --no-cache-dir -e ".[server,vision,observability]"
+# Install all extras needed for API server + cloud ACI offload
+RUN pip install --no-cache-dir -e ".[server,vision,observability,cloud]"
 
 # Bake the Whisper model into /app/.cache so the clipsmith user can access it.
 # Uses the "small" model matching the default in config.yaml (transcribe.model).

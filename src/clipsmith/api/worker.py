@@ -5,14 +5,14 @@ from __future__ import annotations
 import json
 import logging
 import re
+import shutil
 import time
 import unicodedata
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import structlog
-from pathlib import Path
-
 from sqlalchemy.orm import Session
 
 from ..db.models import Clip, PipelineEvent, Run, RunStatus
@@ -32,13 +32,25 @@ def start_run(
     provider: str | None,
     app: Any = None,
     prompt_version: str = "v1",
+    start_s: float = 0.0,
+    end_s: float = 0.0,
+    cloud: bool = False,
 ) -> None:
     """Entry point for BackgroundTasks. Opens its own DB session for thread safety."""
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(run_id=run_id, vod_id=vod_id)
     db = get_session()
     try:
-        _run_pipeline(db, run_id, vod_id, channel, provider, prompt_version=prompt_version)
+        if cloud:
+            _run_cloud_pipeline(
+                db, run_id, vod_id, channel, provider,
+                prompt_version=prompt_version, start_s=start_s, end_s=end_s,
+            )
+        else:
+            _run_pipeline(
+                db, run_id, vod_id, channel, provider,
+                prompt_version=prompt_version, start_s=start_s, end_s=end_s,
+            )
         RUNS_TOTAL.labels(status="done").inc()
     except Exception as exc:
         log.exception("pipeline failed for run %d vod=%s", run_id, vod_id)
@@ -85,6 +97,8 @@ def _run_pipeline(
     provider: str | None,
     *,
     prompt_version: str = "v1",
+    start_s: float = 0.0,
+    end_s: float = 0.0,
 ) -> None:
     cfg = load_config(Path("config.yaml"))
     secrets = load_secrets()
@@ -126,7 +140,11 @@ def _run_pipeline(
     with tracer.start_as_current_span(
         "pipeline.run", attributes={"run_id": str(run_id), "vod_id": vod_id}
     ):
-        process_vod(video, cfg, secrets, on_stage=on_stage, prompt_version=prompt_version)
+        process_vod(
+            video, cfg, secrets,
+            on_stage=on_stage, prompt_version=prompt_version,
+            start_s=start_s, end_s=end_s,
+        )
 
     for stage, (span, t0) in list(_stage_start.items()):
         elapsed = time.monotonic() - t0
@@ -136,6 +154,71 @@ def _run_pipeline(
 
     _harvest_clips(db, run_id, vod_id, cfg)
     _emit(db, run_id, "done", 100.0, "pipeline complete", status=RunStatus.done)
+
+
+def _run_cloud_pipeline(
+    db: Session,
+    run_id: int,
+    vod_id: str,
+    channel: str,
+    provider: str | None,
+    *,
+    prompt_version: str = "v1",
+    start_s: float = 0.0,
+    end_s: float = 0.0,
+) -> None:
+    """Offload the pipeline to an ephemeral ACI container group."""
+    from ..cloud.provisioner import provision_run_resources, teardown_run_resources
+    from ..cloud.azure_runner import (
+        upload_config,
+        create_container_group,
+        poll_until_done,
+        download_output,
+    )
+
+    cfg = load_config(Path("config.yaml"))
+    secrets = load_secrets()
+
+    if not cfg.cloud.docker_image:
+        raise RuntimeError("config.cloud.docker_image must be set to use cloud runs")
+
+    run_ctx = None
+    try:
+        _emit(db, run_id, "provisioning", 5.0, "creating ephemeral Azure resources")
+        run_ctx = provision_run_resources(vod_id, cfg, secrets)
+        log.info("provisioned run context: rg=%s sa=%s", run_ctx.resource_group, run_ctx.storage_account)
+
+        _emit(db, run_id, "uploading", 10.0, "uploading config to file share")
+        upload_config(Path("config.yaml"), secrets, run_ctx)
+
+        _emit(db, run_id, "starting_aci", 15.0, "creating ACI container group")
+        group_name = create_container_group(vod_id, cfg, secrets, run_ctx=run_ctx)
+        log.info("ACI container group created: %s", group_name)
+
+        _emit(db, run_id, "processing", 20.0, "ACI pipeline running — polling every 30s")
+        state = poll_until_done(group_name, cfg, secrets, run_ctx=run_ctx, verbose=True)
+
+        if state != "Succeeded":
+            raise RuntimeError(f"ACI job finished with state '{state}' — check Azure portal logs")
+
+        _emit(db, run_id, "downloading", 90.0, "downloading clips from file share")
+        out_dir = cfg.work_dir.expanduser().parent / "out" / vod_id
+        out_dir.mkdir(parents=True, exist_ok=True)
+        clip_paths = download_output(vod_id, secrets, run_ctx)
+        for p in clip_paths:
+            shutil.copy2(p, out_dir / p.name)
+        log.info("downloaded %d clips to %s", len(clip_paths), out_dir)
+
+        _harvest_clips(db, run_id, vod_id, cfg)
+        _emit(db, run_id, "done", 100.0, "pipeline complete", status=RunStatus.done)
+
+    finally:
+        if run_ctx is not None:
+            try:
+                teardown_run_resources(run_ctx, secrets)
+                log.info("ephemeral Azure resources deleted")
+            except Exception:
+                log.exception("teardown failed for run %d — Azure resources may need manual cleanup", run_id)
 
 
 def _harvest_clips(db: Session, run_id: int, vod_id: str, cfg: AppConfig) -> None:
