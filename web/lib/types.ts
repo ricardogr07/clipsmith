@@ -40,4 +40,7 @@ export interface RunCreate {
   vod_id: string;
   channel?: string;
   provider?: string;
+  start_s?: number;
+  end_s?: number;
+  cloud?: boolean;
 }

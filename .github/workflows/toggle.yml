@@ -29,6 +29,22 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Check for active runs
+        if: inputs.action == 'stop'
+        run: |
+          ACTIVE=$(curl -sf \
+            http://clipsmith-api-dev.eastus.azurecontainer.io:8000/runs \
+            | python3 -c "
+          import sys, json
+          runs = json.load(sys.stdin)
+          print(any(r['status'] in ('pending', 'running') for r in runs))
+          ")
+          if [ "$ACTIVE" = "True" ]; then
+            echo "::error::A pipeline run is in progress — stop blocked. Wait for it to finish or fail."
+            exit 1
+          fi
+          echo "No active runs — safe to stop."
+
       - name: Stop ACI
         if: inputs.action == 'stop'
         run: |
