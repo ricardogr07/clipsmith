@@ -85,6 +85,7 @@ jobs:
             --cpu 1 --memory 2 \
             --ports 8000 \
             --ip-address Public \
+            --dns-name-label clipsmith-api-dev \
             --restart-policy Always \
             --environment-variables \
               CLIPSMITH_API_KEY="${{ secrets.CLIPSMITH_API_KEY }}" \
@@ -119,6 +120,11 @@ jobs:
           done
           echo "::error::Could not retrieve container IP after 100s"
           exit 1
+
+      - name: Print endpoints
+        run: |
+          echo "IP:   http://${{ steps.ip.outputs.ip }}:8000"
+          echo "FQDN: http://clipsmith-api-dev.eastus.azurecontainer.io:8000"
 
       - name: Health check
         id: health

@@ -1,0 +1,51 @@
+name: Toggle ACI
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Start or stop the dev ACI (compute billing pauses when stopped)
+        required: true
+        type: choice
+        options: [start, stop]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  toggle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Start ACI
+        if: inputs.action == 'start'
+        run: |
+          az container start \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --name ${{ secrets.ACI_NAME_DEV }}
+          echo "Container starting…"
+          for i in $(seq 1 12); do
+            STATE=$(az container show \
+              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --name ${{ secrets.ACI_NAME_DEV }} \
+              --query "instanceView.state" -o tsv 2>/dev/null || echo "Unknown")
+            echo "State: $STATE (attempt $i/12)"
+            [ "$STATE" = "Running" ] && break
+            sleep 10
+          done
+          echo ""
+          echo "API: http://clipsmith-api-dev.eastus.azurecontainer.io:8000"
+
+      - name: Stop ACI
+        if: inputs.action == 'stop'
+        run: |
+          az container stop \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --name ${{ secrets.ACI_NAME_DEV }}
+          echo "Container stopped — compute billing paused."
