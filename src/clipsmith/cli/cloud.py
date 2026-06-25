@@ -45,7 +45,7 @@ def setup(
 
     try:
         from azure.identity import DefaultAzureCredential
-        from azure.mgmt.resource import ResourceManagementClient
+        from azure.mgmt.resource.resources import ResourceManagementClient
         from azure.mgmt.storage import StorageManagementClient  # noqa: F401
     except ImportError:
         console.print("[red]Azure packages not installed.[/red] Run: pip install '.[cloud]'")

@@ -37,7 +37,7 @@ def _rg_name(vod_id: str) -> str:
 
 def _resource_client(secrets: Secrets) -> Any:
     from azure.identity import DefaultAzureCredential
-    from azure.mgmt.resource import ResourceManagementClient
+    from azure.mgmt.resource.resources import ResourceManagementClient
 
     return ResourceManagementClient(DefaultAzureCredential(), secrets.azure_subscription_id)
 
