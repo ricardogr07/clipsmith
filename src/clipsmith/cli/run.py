@@ -164,6 +164,9 @@ def run_vod(
     start_at: str | None = typer.Option(
         None, "--start-at", help="Skip content before this timestamp (MM:SS, H:MM:SS, or seconds)"
     ),
+    end_at: str | None = typer.Option(
+        None, "--end-at", help="Skip content after this timestamp (MM:SS, H:MM:SS, or seconds)"
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
     json_logs: bool = typer.Option(False, "--json-logs", help="Emit newline-delimited JSON logs"),
     resume: bool = typer.Option(
@@ -244,6 +247,7 @@ def run_vod(
             provider=provider,
             max_candidates=max_candidates,
             start_s=_parse_start_at(start_at),
+            end_s=_parse_start_at(end_at),
             resume=resume,
         )
     except FileNotFoundError as exc:

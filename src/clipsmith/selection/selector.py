@@ -57,10 +57,13 @@ def select_clips(
     config: ClipConfig,
     *,
     max_candidates: int = 20,
+    min_picks: int = 2,
 ) -> list[PickResult]:
     """Run the LLM over the top candidates and return accepted picks.
 
     Only passes the top max_candidates by score to avoid excessive API calls.
+    If the LLM accepts fewer than min_picks, the top-scored remaining candidates
+    are force-accepted so every run produces at least some output.
     """
     top = _spread_candidates(
         sorted(candidates, key=lambda c: c.score, reverse=True),
@@ -68,6 +71,7 @@ def select_clips(
         max_n=max_candidates,
     )
     picks: list[PickResult] = []
+    picked_centers: set[float] = set()
 
     for i, candidate in enumerate(top, 1):
         log.info(
@@ -79,6 +83,9 @@ def select_clips(
             candidate.sources,
         )
         window = _extract_transcript_window(transcript, candidate.t_center)
+        if window.startswith("(no transcript"):
+            log.warning("no transcript for t=%.1f — skipping LLM call", candidate.t_center)
+            continue
         t0 = time.monotonic()
         pick = picker.pick(window, candidate, stream_context)
         elapsed_ms = round((time.monotonic() - t0) * 1000)
@@ -107,6 +114,49 @@ def select_clips(
             pick.title_es.encode("ascii", "replace").decode("ascii"),
         )
         picks.append(PickResult(candidate=candidate, pick=pick))
+        picked_centers.add(candidate.t_center)
+
+    # Fallback: if LLM was too strict, force-accept top candidates to meet min_picks.
+    if len(picks) < min_picks and top:
+        log.warning(
+            "LLM accepted only %d/%d candidates — force-accepting top picks to reach min_picks=%d",
+            len(picks),
+            len(top),
+            min_picks,
+        )
+        from ..llm.base import ClipPick
+
+        for candidate in top:
+            if len(picks) >= min_picks:
+                break
+            if candidate.t_center in picked_centers:
+                continue
+            if candidate.score <= 0:
+                log.warning(
+                    "skipping force-accept for t=%.1f: score=%.1f (zero-scored candidate)",
+                    candidate.t_center,
+                    candidate.score,
+                )
+                continue
+            start_s = max(0.0, candidate.t_center - config.preroll_s)
+            end_s = start_s + config.max_seconds
+            forced_pick = ClipPick(
+                include=True,
+                start_offset_s=start_s,
+                end_offset_s=end_s,
+                title_es="Momento destacado",
+                reason="Force-accepted: LLM accepted fewer than min_picks candidates.",
+            )
+            forced_pick = _clamp_duration(forced_pick, config)
+            log.info(
+                "  force-accepted: [%.1f-%.1f] t=%.1f score=%.1f",
+                forced_pick.start_offset_s,
+                forced_pick.end_offset_s,
+                candidate.t_center,
+                candidate.score,
+            )
+            picks.append(PickResult(candidate=candidate, pick=forced_pick))
+            picked_centers.add(candidate.t_center)
 
     return picks
 
