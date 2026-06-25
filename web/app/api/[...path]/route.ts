@@ -26,8 +26,8 @@ async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
       body: hasBody ? await req.text() : undefined,
       cache: "no-store",
     });
-    const text = await upstream.text();
-    return new NextResponse(text, {
+    const buffer = await upstream.arrayBuffer();
+    return new NextResponse(buffer, {
       status: upstream.status,
       headers: { "Content-Type": upstream.headers.get("content-type") ?? "application/json" },
     });
