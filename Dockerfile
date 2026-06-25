@@ -4,10 +4,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Azure CLI — installed before pip so its azure libs don't corrupt the namespace packages
-RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash \
-    && rm -rf /var/lib/apt/lists/*
-
 RUN groupadd -r clipsmith && useradd -r -g clipsmith -d /home/clipsmith -m clipsmith
 
 WORKDIR /app
