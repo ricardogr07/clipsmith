@@ -26,10 +26,17 @@ async function proxy(req: NextRequest, path: string[]): Promise<NextResponse> {
       body: hasBody ? await req.text() : undefined,
       cache: "no-store",
     });
-    const buffer = await upstream.arrayBuffer();
-    return new NextResponse(buffer, {
+    const contentType = upstream.headers.get("content-type") ?? "application/json";
+    const responseHeaders: Record<string, string> = { "Content-Type": contentType };
+    // Pass through range/streaming headers so video playback works correctly
+    for (const h of ["Content-Range", "Accept-Ranges", "Content-Length"]) {
+      const v = upstream.headers.get(h);
+      if (v) responseHeaders[h] = v;
+    }
+    // Stream body directly — avoids buffering large files and supports Range requests
+    return new NextResponse(upstream.body, {
       status: upstream.status,
-      headers: { "Content-Type": upstream.headers.get("content-type") ?? "application/json" },
+      headers: responseHeaders,
     });
   } catch (err) {
     console.error("[proxy] Backend unavailable:", url.toString(), (err as Error).message);
