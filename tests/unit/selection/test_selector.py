@@ -124,18 +124,24 @@ def test_select_clips_accept_all() -> None:
 
 def test_select_clips_reject_all() -> None:
     candidates = [_candidate(300.0)]
-    picks = select_clips(candidates, _make_transcript_with_content(), _RejectAll(), "ctx", _cfg())  # type: ignore[arg-type]
+    picks = select_clips(
+        candidates, _make_transcript_with_content(), _RejectAll(), "ctx", _cfg(), min_picks=0
+    )  # type: ignore[arg-type]
     assert picks == []
 
 
 def test_select_clips_fail_treated_as_skip() -> None:
     candidates = [_candidate(300.0)]
-    picks = select_clips(candidates, _make_transcript_with_content(), _FailAll(), "ctx", _cfg())  # type: ignore[arg-type]
+    picks = select_clips(
+        candidates, _make_transcript_with_content(), _FailAll(), "ctx", _cfg(), min_picks=0
+    )  # type: ignore[arg-type]
     assert picks == []
 
 
 def test_select_clips_respects_max_candidates() -> None:
-    candidates = [_candidate(float(i * 100), float(100 - i)) for i in range(10)]
+    # Candidates centered near transcript segments (100s, 290s, 490s) so none are skipped
+    # for missing transcript. Spaced 200s apart to clear min_clip_gap_s=120.
+    candidates = [_candidate(float(150 + i * 200), float(100 - i)) for i in range(10)]
     picker = _AcceptAll()
     select_clips(
         candidates, _make_transcript_with_content(), picker, "ctx", _cfg(), max_candidates=3

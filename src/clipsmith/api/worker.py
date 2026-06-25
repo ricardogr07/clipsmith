@@ -43,13 +43,25 @@ def start_run(
     try:
         if cloud:
             _run_cloud_pipeline(
-                db, run_id, vod_id, channel, provider,
-                prompt_version=prompt_version, start_s=start_s, end_s=end_s,
+                db,
+                run_id,
+                vod_id,
+                channel,
+                provider,
+                prompt_version=prompt_version,
+                start_s=start_s,
+                end_s=end_s,
             )
         else:
             _run_pipeline(
-                db, run_id, vod_id, channel, provider,
-                prompt_version=prompt_version, start_s=start_s, end_s=end_s,
+                db,
+                run_id,
+                vod_id,
+                channel,
+                provider,
+                prompt_version=prompt_version,
+                start_s=start_s,
+                end_s=end_s,
             )
         RUNS_TOTAL.labels(status="done").inc()
     except Exception as exc:
@@ -141,9 +153,13 @@ def _run_pipeline(
         "pipeline.run", attributes={"run_id": str(run_id), "vod_id": vod_id}
     ):
         process_vod(
-            video, cfg, secrets,
-            on_stage=on_stage, prompt_version=prompt_version,
-            start_s=start_s, end_s=end_s,
+            video,
+            cfg,
+            secrets,
+            on_stage=on_stage,
+            prompt_version=prompt_version,
+            start_s=start_s,
+            end_s=end_s,
         )
 
     for stage, (span, t0) in list(_stage_start.items()):
@@ -174,6 +190,7 @@ def _run_cloud_pipeline(
         create_container_group,
         poll_until_done,
         download_output,
+        download_picks,
     )
 
     cfg = load_config(Path("config.yaml"))
@@ -186,13 +203,17 @@ def _run_cloud_pipeline(
     try:
         _emit(db, run_id, "provisioning", 5.0, "creating ephemeral Azure resources")
         run_ctx = provision_run_resources(vod_id, cfg, secrets)
-        log.info("provisioned run context: rg=%s sa=%s", run_ctx.resource_group, run_ctx.storage_account)
+        log.info(
+            "provisioned run context: rg=%s sa=%s", run_ctx.resource_group, run_ctx.storage_account
+        )
 
         _emit(db, run_id, "uploading", 10.0, "uploading config to file share")
         upload_config(Path("config.yaml"), secrets, run_ctx)
 
         _emit(db, run_id, "starting_aci", 15.0, "creating ACI container group")
-        group_name = create_container_group(vod_id, cfg, secrets, run_ctx=run_ctx)
+        group_name = create_container_group(
+            vod_id, cfg, secrets, run_ctx=run_ctx, start_s=start_s, end_s=end_s
+        )
         log.info("ACI container group created: %s", group_name)
 
         _emit(db, run_id, "processing", 20.0, "ACI pipeline running — polling every 30s")
@@ -209,6 +230,13 @@ def _run_cloud_pipeline(
             shutil.copy2(p, out_dir / p.name)
         log.info("downloaded %d clips to %s", len(clip_paths), out_dir)
 
+        picks_bytes = download_picks(vod_id, secrets, run_ctx)
+        if picks_bytes:
+            local_work = cfg.work_dir.expanduser() / vod_id
+            local_work.mkdir(parents=True, exist_ok=True)
+            (local_work / "picks.json").write_bytes(picks_bytes)
+            log.info("downloaded picks.json from work share (%d bytes)", len(picks_bytes))
+
         _harvest_clips(db, run_id, vod_id, cfg)
         _emit(db, run_id, "done", 100.0, "pipeline complete", status=RunStatus.done)
 
@@ -218,7 +246,9 @@ def _run_cloud_pipeline(
                 teardown_run_resources(run_ctx, secrets)
                 log.info("ephemeral Azure resources deleted")
             except Exception:
-                log.exception("teardown failed for run %d — Azure resources may need manual cleanup", run_id)
+                log.exception(
+                    "teardown failed for run %d — Azure resources may need manual cleanup", run_id
+                )
 
 
 def _harvest_clips(db: Session, run_id: int, vod_id: str, cfg: AppConfig) -> None:

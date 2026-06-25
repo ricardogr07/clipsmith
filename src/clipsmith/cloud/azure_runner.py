@@ -61,6 +61,28 @@ def upload_config(config_path: Path, secrets: Secrets, run_ctx: RunContext | Non
     log.info("uploaded %s to %s", config_path.name, _WORK_SHARE)
 
 
+def _build_run_command(vod_id: str, *, start_s: float = 0.0, end_s: float = 0.0) -> list[str]:
+    cmd = ["clipsmith", "run-vod", vod_id, "--config", "/app/work/config.yaml", "-v"]
+    if start_s > 0:
+        cmd += ["--start-at", str(int(start_s))]
+    if end_s > 0:
+        cmd += ["--end-at", str(int(end_s))]
+    return cmd
+
+
+def download_picks(
+    vod_id: str, secrets: Secrets, run_ctx: RunContext | None = None
+) -> bytes | None:
+    """Download picks.json from the work file share. Returns raw bytes or None if not found."""
+    share = _share_client(secrets, _WORK_SHARE, run_ctx)
+    dir_client = share.get_directory_client(vod_id)
+    try:
+        return dir_client.get_file_client("picks.json").download_file().readall()
+    except Exception as exc:
+        log.warning("picks.json not found in work share for %s: %s", vod_id, exc)
+        return None
+
+
 def create_container_group(
     vod_id: str,
     config: AppConfig,
@@ -68,6 +90,8 @@ def create_container_group(
     *,
     run_ctx: RunContext | None = None,
     dry_run: bool = False,
+    start_s: float = 0.0,
+    end_s: float = 0.0,
 ) -> str:
     """Create the ACI container group. Returns the group name."""
     group_name = f"clipsmith-{vod_id}"
@@ -155,7 +179,7 @@ def create_container_group(
             VolumeMount(name="work", mount_path="/app/work"),
             VolumeMount(name="out", mount_path="/app/out"),
         ],
-        command=["clipsmith", "run-vod", vod_id, "--config", "/app/work/config.yaml", "-v"],
+        command=_build_run_command(vod_id, start_s=start_s, end_s=end_s),
     )
 
     registry_creds = None
