@@ -38,6 +38,8 @@ export const api = {
       apiFetch<Clip>(`/clips/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   },
   sseUrl: (runId: number) => `${DIRECT}/runs/${runId}/progress`,
+  // File downloads go through the proxy (same origin) to avoid mixed-content
+  // blocks when the dashboard is served over HTTPS but the API is plain HTTP.
   fileUrl: (runId: number, filename: string) =>
-    `${DIRECT}/runs/${runId}/clips/file/${encodeURIComponent(filename)}`,
+    `${PROXY}/runs/${runId}/clips/file/${encodeURIComponent(filename)}`,
 };
