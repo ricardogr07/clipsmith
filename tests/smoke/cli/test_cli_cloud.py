@@ -20,15 +20,17 @@ def _azure_mgmt_modules() -> dict:
     identity = ModuleType("azure.identity")
     mgmt = ModuleType("azure.mgmt")
     resource_mod = ModuleType("azure.mgmt.resource")
+    resource_resources_mod = ModuleType("azure.mgmt.resource.resources")
     storage_mod = ModuleType("azure.mgmt.storage")
 
     identity.DefaultAzureCredential = MagicMock(name="DefaultAzureCredential")  # type: ignore[attr-defined]
-    resource_mod.ResourceManagementClient = MagicMock(name="ResourceManagementClient")  # type: ignore[attr-defined]
+    resource_resources_mod.ResourceManagementClient = MagicMock(name="ResourceManagementClient")  # type: ignore[attr-defined]
     storage_mod.StorageManagementClient = MagicMock(name="StorageManagementClient")  # type: ignore[attr-defined]
 
     azure.identity = identity  # type: ignore[attr-defined]
     azure.mgmt = mgmt  # type: ignore[attr-defined]
     mgmt.resource = resource_mod  # type: ignore[attr-defined]
+    resource_mod.resources = resource_resources_mod  # type: ignore[attr-defined]
     mgmt.storage = storage_mod  # type: ignore[attr-defined]
 
     return {
@@ -36,6 +38,7 @@ def _azure_mgmt_modules() -> dict:
         "azure.identity": identity,
         "azure.mgmt": mgmt,
         "azure.mgmt.resource": resource_mod,
+        "azure.mgmt.resource.resources": resource_resources_mod,
         "azure.mgmt.storage": storage_mod,
     }
 
@@ -52,7 +55,7 @@ def test_cloud_setup_passes_valid_credentials(tmp_path: Path) -> None:
     mock_rc = MagicMock()
     mock_rc.resource_groups.list.return_value = iter([])
     mods = _azure_mgmt_modules()
-    mods["azure.mgmt.resource"].ResourceManagementClient.return_value = mock_rc
+    mods["azure.mgmt.resource.resources"].ResourceManagementClient.return_value = mock_rc
 
     with patch.dict(sys.modules, mods):
         result = runner.invoke(
@@ -86,7 +89,7 @@ def test_cloud_setup_fails_azure_auth_error(tmp_path: Path) -> None:
     mock_rc = MagicMock()
     mock_rc.resource_groups.list.side_effect = RuntimeError("auth failed")
     mods = _azure_mgmt_modules()
-    mods["azure.mgmt.resource"].ResourceManagementClient.return_value = mock_rc
+    mods["azure.mgmt.resource.resources"].ResourceManagementClient.return_value = mock_rc
 
     with patch.dict(sys.modules, mods):
         result = runner.invoke(
