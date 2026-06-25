@@ -21,6 +21,8 @@ interface Props {
   eventSourceFactory?: EventSourceFactory;
 }
 
+const MAX_RETRIES = 5;
+
 export function ProgressStream({ runId, onDone, eventSourceFactory }: Props) {
   const [state, setState] = useState<StreamState>({
     stage: "starting",
@@ -30,52 +32,66 @@ export function ProgressStream({ runId, onDone, eventSourceFactory }: Props) {
     error: null,
   });
   const esRef = useRef<EventSource | null>(null);
+  const retriesRef = useRef(0);
 
   useEffect(() => {
     const factory = eventSourceFactory ?? ((url: string) => new EventSource(url));
-    const es = factory(api.sseUrl(runId));
-    esRef.current = es;
 
-    es.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data) as Partial<PipelineEvent> & {
-          event?: string;
-          status?: string;
-          error?: string;
-        };
+    function connect() {
+      esRef.current?.close();
+      const es = factory(api.sseUrl(runId));
+      esRef.current = es;
 
-        if (data.event === "end") {
-          setState((s) => ({
-            ...s,
-            done: true,
-            pct: data.status === "done" ? 100 : s.pct,
-            error: data.error ?? null,
-          }));
-          es.close();
-          onDone?.();
-          return;
+      es.onmessage = (e) => {
+        retriesRef.current = 0; // reset on any successful message
+        try {
+          const data = JSON.parse(e.data) as Partial<PipelineEvent> & {
+            event?: string;
+            status?: string;
+            error?: string;
+          };
+
+          if (data.event === "end") {
+            setState((s) => ({
+              ...s,
+              done: true,
+              pct: data.status === "done" ? 100 : s.pct,
+              error: data.error ?? null,
+            }));
+            es.close();
+            onDone?.();
+            return;
+          }
+
+          if (data.stage !== undefined) {
+            setState((s) => ({
+              ...s,
+              stage: data.stage!,
+              pct: data.pct ?? s.pct,
+              message: data.message ?? "",
+            }));
+          }
+        } catch {
+          // malformed SSE frame — skip
         }
+      };
 
-        if (data.stage !== undefined) {
-          setState((s) => ({
-            ...s,
-            stage: data.stage!,
-            pct: data.pct ?? s.pct,
-            message: data.message ?? "",
-          }));
+      es.onerror = () => {
+        es.close();
+        if (retriesRef.current < MAX_RETRIES) {
+          retriesRef.current += 1;
+          // exponential back-off: 2s, 4s, 8s, 16s, 32s
+          setTimeout(connect, Math.min(2 ** retriesRef.current * 1000, 32_000));
+        } else {
+          setState((s) => ({ ...s, done: true, error: "Stream disconnected" }));
         }
-      } catch {
-        // malformed SSE frame — skip
-      }
-    };
+      };
+    }
 
-    es.onerror = () => {
-      setState((s) => ({ ...s, done: true, error: "Stream disconnected" }));
-      es.close();
-    };
+    connect();
 
     return () => {
-      es.close();
+      esRef.current?.close();
     };
   }, [runId, onDone, eventSourceFactory]);
 
