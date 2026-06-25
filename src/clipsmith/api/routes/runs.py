@@ -121,16 +121,16 @@ def delete_all_runs(request: Request, db: Session = Depends(get_db)) -> Response
 @router.delete(
     "/{run_id}",
     status_code=204,
-    summary="Delete a failed run",
+    summary="Delete a run",
     dependencies=[Depends(verify_api_key)],
 )
-def delete_run(run_id: int, db: Session = Depends(get_db)) -> Response:
-    """Delete a single failed run and its clips/events. Returns 409 if not failed."""
+def delete_run(run_id: int, request: Request, db: Session = Depends(get_db)) -> Response:
+    """Delete a run and its clips/events. Blocked if the run is currently active."""
     run = db.get(Run, run_id)
     if not run:
         raise HTTPException(404, "Run not found")
-    if run.status != RunStatus.failed:
-        raise HTTPException(409, "Only failed runs can be deleted")
+    if request.app.state.active_run_id == run_id:
+        raise HTTPException(409, "Cannot delete a run that is currently in progress")
     db.query(PipelineEvent).filter(PipelineEvent.run_id == run_id).delete()
     db.query(Clip).filter(Clip.run_id == run_id).delete()
     db.delete(run)
