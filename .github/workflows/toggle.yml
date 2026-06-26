@@ -4,10 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: Start or stop the dev ACI (compute billing pauses when stopped)
+        description: >
+          start  — bring the dev ACI up (re-creates container group if previously torn down).
+          stop   — pause compute billing (data preserved).
+          teardown — delete container group + wipe file share contents (zero-cost idle; run Deploy to restore).
         required: true
         type: choice
-        options: [start, stop]
+        options: [start, stop, teardown]
 
 permissions:
   id-token: write
@@ -29,8 +32,9 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # ── Guard: block stop/teardown while a pipeline run is active ──────────
       - name: Check for active runs
-        if: inputs.action == 'stop'
+        if: inputs.action == 'stop' || inputs.action == 'teardown'
         run: |
           ACTIVE=$(curl -sf \
             http://clipsmith-api-dev.eastus.azurecontainer.io:8000/runs \
@@ -38,30 +42,81 @@ jobs:
           import sys, json
           runs = json.load(sys.stdin)
           print(any(r['status'] in ('pending', 'running') for r in runs))
-          ")
+          " 2>/dev/null || echo "False")
           if [ "$ACTIVE" = "True" ]; then
-            echo "::error::A pipeline run is in progress — stop blocked. Wait for it to finish or fail."
+            echo "::error::A pipeline run is in progress — ${{ inputs.action }} blocked. Wait for it to finish or fail."
             exit 1
           fi
-          echo "No active runs — safe to stop."
+          echo "No active runs — safe to ${{ inputs.action }}."
 
+      # ── STOP ───────────────────────────────────────────────────────────────
       - name: Stop ACI
         if: inputs.action == 'stop'
         run: |
           az container stop \
             --resource-group ${{ secrets.RESOURCE_GROUP }} \
             --name ${{ secrets.ACI_NAME_DEV }}
-          echo "Container stopped — compute billing paused."
+          echo "Container stopped — compute billing paused. File share data preserved."
 
-      - name: Enable maintenance mode
+      - name: Enable maintenance mode (stop)
         if: inputs.action == 'stop'
         run: |
           npx vercel env rm MAINTENANCE_MODE production --yes --token "${{ secrets.VERCEL_TOKEN }}" || true
           echo "true" | npx vercel env add MAINTENANCE_MODE production --token "${{ secrets.VERCEL_TOKEN }}"
           npx vercel --prod --yes --token "${{ secrets.VERCEL_TOKEN }}" --cwd web
 
-      - name: Start ACI
+      # ── TEARDOWN ───────────────────────────────────────────────────────────
+      - name: Delete ACI container group
+        if: inputs.action == 'teardown'
+        run: |
+          az container delete \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --name ${{ secrets.ACI_NAME_DEV }} \
+            --yes 2>/dev/null || echo "Container group not found or already deleted."
+          echo "Container group deleted — compute billing stopped."
+
+      - name: Wipe clipsmith-data file share (DB + work files)
+        if: inputs.action == 'teardown'
+        run: |
+          az storage file delete-batch \
+            --source clipsmith-data \
+            --account-name ${{ secrets.STORAGE_ACCOUNT_NAME }} \
+            --account-key "${{ secrets.STORAGE_ACCOUNT_KEY }}"
+          echo "clipsmith-data share wiped."
+
+      - name: Wipe clipsmith-out file share (rendered clips)
+        if: inputs.action == 'teardown'
+        run: |
+          az storage file delete-batch \
+            --source clipsmith-out \
+            --account-name ${{ secrets.STORAGE_ACCOUNT_NAME }} \
+            --account-key "${{ secrets.STORAGE_ACCOUNT_KEY }}"
+          echo "clipsmith-out share wiped."
+
+      - name: Enable maintenance mode (teardown)
+        if: inputs.action == 'teardown'
+        run: |
+          npx vercel env rm MAINTENANCE_MODE production --yes --token "${{ secrets.VERCEL_TOKEN }}" || true
+          echo "true" | npx vercel env add MAINTENANCE_MODE production --token "${{ secrets.VERCEL_TOKEN }}"
+          npx vercel --prod --yes --token "${{ secrets.VERCEL_TOKEN }}" --cwd web
+          echo ""
+          echo "Teardown complete. Storage account and file shares preserved (empty = near-zero cost)."
+          echo "To restore: trigger the Deploy workflow, then run this toggle with action=start."
+
+      # ── START ──────────────────────────────────────────────────────────────
+      - name: Check if container group exists
         if: inputs.action == 'start'
+        id: cg_state
+        run: |
+          STATE=$(az container show \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --name ${{ secrets.ACI_NAME_DEV }} \
+            --query "instanceView.state" -o tsv 2>/dev/null || echo "NotFound")
+          echo "state=$STATE" >> "$GITHUB_OUTPUT"
+          echo "Container group state: $STATE"
+
+      - name: Start existing ACI
+        if: inputs.action == 'start' && steps.cg_state.outputs.state != 'NotFound'
         run: |
           az container start \
             --resource-group ${{ secrets.RESOURCE_GROUP }} \
@@ -76,8 +131,83 @@ jobs:
             [ "$STATE" = "Running" ] && break
             sleep 10
           done
-          echo ""
-          echo "API: http://clipsmith-api-dev.eastus.azurecontainer.io:8000"
+
+      - name: Re-create ACI from latest image (post-teardown)
+        if: inputs.action == 'start' && steps.cg_state.outputs.state == 'NotFound'
+        run: |
+          ACI_NAME="${{ secrets.ACI_NAME_DEV }}"
+          IMAGE="${{ secrets.ACR_LOGIN_SERVER }}/clipsmith:latest"
+          cat > /tmp/container.yaml << YAML
+          apiVersion: '2021-10-01'
+          location: eastus
+          name: "$ACI_NAME"
+          identity:
+            type: UserAssigned
+            userAssignedIdentities:
+              "${{ secrets.MI_RESOURCE_ID }}": {}
+          properties:
+            osType: Linux
+            restartPolicy: Always
+            ipAddress:
+              type: Public
+              ports:
+                - protocol: TCP
+                  port: 8000
+              dnsNameLabel: clipsmith-api-dev
+            imageRegistryCredentials:
+              - server: "${{ secrets.ACR_LOGIN_SERVER }}"
+                username: "${{ secrets.ACR_USERNAME }}"
+                password: "${{ secrets.ACR_PASSWORD }}"
+            containers:
+              - name: clipsmith-api
+                properties:
+                  image: "$IMAGE"
+                  resources:
+                    requests:
+                      cpu: 1
+                      memoryInGb: 2
+                  ports:
+                    - port: 8000
+                  environmentVariables:
+                    - name: CLIPSMITH_API_KEY
+                      value: "${{ secrets.CLIPSMITH_API_KEY }}"
+                    - name: DATABASE_URL
+                      value: "sqlite:////app/data/clipsmith.db"
+                    - name: AZURE_SUBSCRIPTION_ID
+                      value: "${{ secrets.AZURE_SUBSCRIPTION_ID }}"
+                    - name: AZURE_CLIENT_ID
+                      value: "${{ secrets.AZURE_CLIENT_ID }}"
+                  volumeMounts:
+                    - name: data-vol
+                      mountPath: /app/data
+                    - name: out-vol
+                      mountPath: /app/out
+            volumes:
+              - name: data-vol
+                azureFile:
+                  shareName: clipsmith-data
+                  storageAccountName: "${{ secrets.STORAGE_ACCOUNT_NAME }}"
+                  storageAccountKey: "${{ secrets.STORAGE_ACCOUNT_KEY }}"
+              - name: out-vol
+                azureFile:
+                  shareName: clipsmith-out
+                  storageAccountName: "${{ secrets.STORAGE_ACCOUNT_NAME }}"
+                  storageAccountKey: "${{ secrets.STORAGE_ACCOUNT_KEY }}"
+          YAML
+          az container create \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --file /tmp/container.yaml \
+            --no-wait
+          echo "Container group re-created from latest image. Waiting for Running state…"
+          for i in $(seq 1 20); do
+            STATE=$(az container show \
+              --resource-group ${{ secrets.RESOURCE_GROUP }} \
+              --name "$ACI_NAME" \
+              --query "instanceView.state" -o tsv 2>/dev/null || echo "Unknown")
+            echo "State: $STATE (attempt $i/20)"
+            [ "$STATE" = "Running" ] && break
+            sleep 15
+          done
 
       - name: Disable maintenance mode
         if: inputs.action == 'start'
@@ -85,3 +215,5 @@ jobs:
           npx vercel env rm MAINTENANCE_MODE production --yes --token "${{ secrets.VERCEL_TOKEN }}" || true
           echo "false" | npx vercel env add MAINTENANCE_MODE production --token "${{ secrets.VERCEL_TOKEN }}"
           npx vercel --prod --yes --token "${{ secrets.VERCEL_TOKEN }}" --cwd web
+          echo ""
+          echo "API: http://clipsmith-api-dev.eastus.azurecontainer.io:8000"
