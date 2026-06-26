@@ -15,6 +15,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  actions: read
 
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -31,6 +32,24 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # ── Guard: block teardown while Deploy workflow is in progress ────────
+      - name: Check for in-progress Deploy
+        if: inputs.action == 'teardown'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUNNING=$(gh run list \
+            --repo ${{ github.repository }} \
+            --workflow=deploy.yml \
+            --status=in_progress \
+            --json databaseId \
+            --jq 'length')
+          if [ "$RUNNING" -gt 0 ]; then
+            echo "::error::A Deploy workflow is in progress — teardown blocked to avoid SMB lock conflicts. Wait for it to finish or cancel it first."
+            exit 1
+          fi
+          echo "No active Deploy runs — safe to proceed."
 
       # ── Guard: block stop/teardown while a pipeline run is active ──────────
       - name: Check for active runs
@@ -74,6 +93,8 @@ jobs:
             --name ${{ secrets.ACI_NAME_DEV }} \
             --yes 2>/dev/null || echo "Container group not found or already deleted."
           echo "Container group deleted — compute billing stopped."
+          echo "Waiting 60s for Azure to release SMB locks on file shares…"
+          sleep 60
 
       - name: Wipe clipsmith-data file share (DB + work files)
         if: inputs.action == 'teardown'
