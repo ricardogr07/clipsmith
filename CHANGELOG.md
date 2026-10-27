@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.3.0](https://github.com/ricardogr07/clipsmith/compare/v0.2.1...v0.3.0) (2026-06-26)
+
+
+### Features
+
+* ACI start/stop toggle workflow + stable DNS hostname ([#23](https://github.com/ricardogr07/clipsmith/issues/23)) ([70e3c1b](https://github.com/ricardogr07/clipsmith/commit/70e3c1b51959babc2b8b8052c1cb8cd93d98a67c))
+* add cloud/start_s/end_s to New Run dialog + toggle stop guard ([#25](https://github.com/ricardogr07/clipsmith/issues/25)) ([ac2b3f5](https://github.com/ricardogr07/clipsmith/commit/ac2b3f55f4a771e338623d92fed4ea3f80c24040))
+* add teardown option to toggle workflow ([#36](https://github.com/ricardogr07/clipsmith/issues/36)) ([32caacf](https://github.com/ricardogr07/clipsmith/commit/32caacfe170fd6dd2dae8437657c3bf03bb5195f))
+* GitHub Actions as single Vercel deploy source + maintenance mode ([#24](https://github.com/ricardogr07/clipsmith/issues/24)) ([0f9c038](https://github.com/ricardogr07/clipsmith/commit/0f9c03810919824bd73d1984e1d94ffd7f5da410))
+* mount Azure File Shares for persistent DB and clips storage ([#26](https://github.com/ricardogr07/clipsmith/issues/26)) ([fc7864a](https://github.com/ricardogr07/clipsmith/commit/fc7864a76a08b933e1d4b1222705e69e13eabfb3))
+* Spanish Colab notebook + Drive save with clip selection ([#6](https://github.com/ricardogr07/clipsmith/issues/6)) ([24a58bc](https://github.com/ricardogr07/clipsmith/commit/24a58bc5997c2612c5ee05e1e7c5b9d68e8157d6))
+* Sprint 1 — FastAPI REST layer + SQLite persistence ([#7](https://github.com/ricardogr07/clipsmith/issues/7)) ([0f64418](https://github.com/ricardogr07/clipsmith/commit/0f644181c0cfdc71a888687b96c1987852b461c9))
+* Sprint 12 — Stage 6 Managed Identity + persistent ACI auth + delete failed run UI ([#20](https://github.com/ricardogr07/clipsmith/issues/20)) ([4d0af6f](https://github.com/ricardogr07/clipsmith/commit/4d0af6f4a2b21ee3200b9c732396fd98672d8c6e))
+* Sprint 2 — Next.js 16 dashboard ([#9](https://github.com/ricardogr07/clipsmith/issues/9)) ([ea7b0be](https://github.com/ricardogr07/clipsmith/commit/ea7b0bebde1a40dc2975738a2a3698260a9f13f0))
+* Sprint 3 — Observability + Pipeline Reliability ([#11](https://github.com/ricardogr07/clipsmith/issues/11)) ([858f447](https://github.com/ricardogr07/clipsmith/commit/858f447735585942fcc0f1da1bbf3af8a0698638))
+* Sprint 4 — Publishing + Polish ([#12](https://github.com/ricardogr07/clipsmith/issues/12)) ([4d48e73](https://github.com/ricardogr07/clipsmith/commit/4d48e7367944da1b67714dee1b75b4434fb5e855))
+* Sprint 5 — ML feedback loop + API docs + Postman collection ([#15](https://github.com/ricardogr07/clipsmith/issues/15)) ([46fde5c](https://github.com/ricardogr07/clipsmith/commit/46fde5cb53173d0bea3c6fc015bb05648fad5ac3))
+* Sprint 6 — Terraform IaC, ACR, and Key Vault ([#16](https://github.com/ricardogr07/clipsmith/issues/16)) ([4524d15](https://github.com/ricardogr07/clipsmith/commit/4524d15f146b4c385ceaebe7f8805a0f5a550f04))
+* Sprint 7 — Observability Stack (OpenTelemetry + Prometheus + Grafana) ([bc2f13e](https://github.com/ricardogr07/clipsmith/commit/bc2f13ec6638253068a8ccc61c904b65deedc22f))
+* Sprint 8 — Run Detail UI + keyboard nav + signal breakdown ([#18](https://github.com/ricardogr07/clipsmith/issues/18)) ([4a9d11d](https://github.com/ricardogr07/clipsmith/commit/4a9d11dbeaae93bcf50d4cf19be44881daa4bd1c))
+* Sprint 9 — Alembic migrations + DATABASE_URL abstraction ([#19](https://github.com/ricardogr07/clipsmith/issues/19)) ([bb85e56](https://github.com/ricardogr07/clipsmith/commit/bb85e56dd2097f29ef23d9cca0b486e40587fab7))
+
+
+### Bug Fixes
+
+* add --os-type Linux to az container create in deploy.yml ([#21](https://github.com/ricardogr07/clipsmith/issues/21)) ([7bf108d](https://github.com/ricardogr07/clipsmith/commit/7bf108df3444c501737ffaca343ee9b9465f7642))
+* allow deleting any non-active run via DELETE /runs/{id} ([#32](https://github.com/ricardogr07/clipsmith/issues/32)) ([29d6470](https://github.com/ricardogr07/clipsmith/commit/29d64706298366148a61d1566795e3af93f9cc45))
+* clip videos blocked by mixed-content + binary corruption in proxy ([#34](https://github.com/ricardogr07/clipsmith/issues/34)) ([820cba2](https://github.com/ricardogr07/clipsmith/commit/820cba2ce539a6d0259a5b191ac9e58e0e4f8856))
+* cloud clips always 0 + quality guardrails for LLM selection ([#31](https://github.com/ricardogr07/clipsmith/issues/31)) ([3002191](https://github.com/ricardogr07/clipsmith/commit/30021918772f51d5ed95c8c3bac4d62da4976a2f))
+* create app data/work/out dirs with clipsmith ownership + robust IP/health wait ([#22](https://github.com/ricardogr07/clipsmith/issues/22)) ([f15fa2f](https://github.com/ricardogr07/clipsmith/commit/f15fa2fa3ef426363b34ae403ac857a4cf98dbd6))
+* extend health check to 360s and use FQDN (avoids race on image pull) ([#27](https://github.com/ricardogr07/clipsmith/issues/27)) ([667155b](https://github.com/ricardogr07/clipsmith/commit/667155b7006ec33424d8cbc77bd617cb94b62a29))
+* guard teardown against concurrent Deploy + release SMB locks ([#37](https://github.com/ricardogr07/clipsmith/issues/37)) ([44d4706](https://github.com/ricardogr07/clipsmith/commit/44d470686af0bf73d5bd1e22aadb5af4aac6daa1))
+* install Azure CLI before pip to prevent azure.mgmt namespace corruption ([#28](https://github.com/ricardogr07/clipsmith/issues/28)) ([da86175](https://github.com/ricardogr07/clipsmith/commit/da86175c8d2d338bdec07afd92880a006e6c4627))
+* proxy drops range headers and buffers video — breaks playback ([#35](https://github.com/ricardogr07/clipsmith/issues/35)) ([b521c60](https://github.com/ricardogr07/clipsmith/commit/b521c60fe04fb7a9fe4539fdb1d99d9de54e8ea0))
+* remove Azure CLI from image — provisioner uses Python SDK only ([#29](https://github.com/ricardogr07/clipsmith/issues/29)) ([349df5c](https://github.com/ricardogr07/clipsmith/commit/349df5ce0dd6841015cbdf93ad90242e8d51f3ca))
+* security hardening — API auth, input validation, path safety, CORS ([#13](https://github.com/ricardogr07/clipsmith/issues/13)) ([539b73e](https://github.com/ricardogr07/clipsmith/commit/539b73e637600b459c6a66615e6f97a6e8658d7b))
+* SSE stream disconnects during long cloud runs ([#33](https://github.com/ricardogr07/clipsmith/issues/33)) ([5df65e9](https://github.com/ricardogr07/clipsmith/commit/5df65e98a54b92b7b61ffcf6bfd00ef59c45076b))
+* stream upstream.body directly and pass through range headers. ([b521c60](https://github.com/ricardogr07/clipsmith/commit/b521c60fe04fb7a9fe4539fdb1d99d9de54e8ea0))
+* update ResourceManagementClient import path for azure-mgmt-resource v26 ([#30](https://github.com/ricardogr07/clipsmith/issues/30)) ([046d96a](https://github.com/ricardogr07/clipsmith/commit/046d96a29c70e8ecd957ec7cf56e916190027f08))
+* use PAT for release-please so tag pushes trigger publish workflow ([#4](https://github.com/ricardogr07/clipsmith/issues/4)) ([50e0610](https://github.com/ricardogr07/clipsmith/commit/50e0610cb5aa739a6769e44f9ac8aa031645ff2d))
+
 ## [Unreleased]
 
 ### Sprints 1–7 — Full-Stack AI Pipeline (post-0.2.1)
